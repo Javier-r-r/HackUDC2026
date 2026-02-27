@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Kelea Digital Brain",
+  "version": "1.0",
+  "description": "Tu Inbox personal: Captura ideas, enlaces y textos sin fricción.",
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Abrir Inbox"
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

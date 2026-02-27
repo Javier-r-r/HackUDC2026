@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="header">
+    <h1>🧠 Kelea Brain</h1>
+  </div>
+
+  <div class="tabs">
+    <button id="tab-capture" class="active">Capturar</button>
+    <button id="tab-inbox">Inbox</button>
+  </div>
+
+  <div id="view-capture" class="view active">
+    <textarea id="quick-note" placeholder="Escribe una idea brillante..."></textarea>
+    <button id="btn-save" class="btn-primary">Guardar Idea</button>
+    <p id="status-msg" class="hidden">¡Guardado en el Inbox!</p>
+  </div>
+
+  <div id="view-inbox" class="view hidden">
+    <div id="inbox-list"></div>
+    <button id="btn-export" class="btn-secondary">⬇️ Exportar a Markdown</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
