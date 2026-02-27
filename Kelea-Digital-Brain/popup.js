@@ -105,7 +105,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       mdContent += `## [${type}] ${title}\n`;
       mdContent += `- **Fecha:** ${new Date(item.timestamp).toLocaleString()}\n`;
-      mdContent += `- **Categoría:** ${category} ${tags}\n`;
+      mdContent += `- **Categoría:** ${category} \n`;
+      if (tags) {
+        mdContent += `- **Etiquetas:** ${tags}\n`;
+      }
       
       if (url !== 'Sin enlace') {
         mdContent += `- **Fuente:** [Ver enlace original](${url})\n\n`;
