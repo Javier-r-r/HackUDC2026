@@ -1,7 +1,3 @@
-// ATENCIÓN: Para el hackathon, puedes poner tu clave aquí directamente para testear rápido, 
-// pero en producción SIEMPRE debe ir en variables de entorno o en las Opciones de la extensión.
-const API_KEY = "Groq API Key aquí"; 
-
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "capture-selection",
@@ -53,14 +49,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 async function analyzeWithLLM(text) {
   try {
+    // 1. OBTENER LA CLAVE DEL STORAGE
+    const result = await chrome.storage.local.get(['apiKey']);
+    const apiKey = result.apiKey;
+
+    if (!apiKey) {
+      console.warn("⚠️ No hay API Key configurada. Por favor, ve a las opciones de la extensión.");
+      return null; // Devolvemos null para que se guarde sin categorizar pero no de error
+    }
+
+    // 2. HACER LA PETICIÓN USANDO LA CLAVE DINÁMICA
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
+        'Authorization': `Bearer ${apiKey}` // Usamos la variable apiKey aquí
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant", // Modelo gratuito y ultrarrápido
+        model: "llama-3.1-8b-instant", // El modelo actual de Groq
         messages: [
           {
             role: "system",
@@ -78,14 +84,12 @@ async function analyzeWithLLM(text) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      // Ahora sí veremos el error real formateado
       console.error("❌ Groq ha rechazado la petición:", JSON.stringify(errorData, null, 2));
       return null;
     }
 
     const data = await response.json();
     let resultText = data.choices[0].message.content;
-
     resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(resultText); 
