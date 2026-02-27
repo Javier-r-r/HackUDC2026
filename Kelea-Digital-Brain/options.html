@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Configuración - Kelea Brain</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Estilos específicos para la página de opciones */
+    body {
+      width: 400px; /* Más ancho que el popup */
+      margin: 40px auto; /* Centrado en la pantalla */
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    input[type="password"] {
+      width: 100%;
+      background-color: var(--surface);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      box-sizing: border-box;
+      margin-bottom: 20px;
+      font-family: monospace;
+    }
+    input[type="password"]:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="header" style="border-bottom: none; padding: 0 0 16px 0;">
+    <h1>⚙️ Configuración del Cerebro</h1>
+    <p style="color: var(--text-muted); font-size: 13px;">Conecta tu modelo de IA para categorizar automáticamente.</p>
+  </div>
+
+  <div>
+    <label for="apiKey">API Key de Groq:</label>
+    <input type="password" id="apiKey" placeholder="gsk_...">
+    
+    <button id="btn-save-options" class="btn-primary">Guardar Configuración</button>
+    <p id="status-options" class="hidden" style="color: #4caf50; margin-top: 12px; text-align: center; font-weight: bold;">¡Clave guardada de forma segura!</p>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
