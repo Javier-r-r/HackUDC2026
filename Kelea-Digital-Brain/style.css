@@ -171,3 +171,61 @@ button.btn-primary, button.btn-secondary {
   background-color: #cf6679;
   color: #121212;
 }
+
+/* Estados y validación (NUEVO) */
+.status-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.status-pending { 
+  background-color: #cf6679; /* Rojo suave */
+  color: #121212; 
+}
+.status-processed { 
+  background-color: #4caf50; /* Verde */
+  color: #121212; 
+}
+
+.item-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.btn-small {
+  background-color: var(--surface);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-small:hover { border-color: var(--primary); }
+.btn-success { color: #4caf50; border-color: #4caf50; }
+.btn-success:hover { background-color: #4caf50; color: #000; }
+
+.edit-form {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #1a1a1a;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+}
+
+.edit-form input {
+  background-color: var(--bg-color);
+  border: 1px solid var(--border);
+  color: white;
+  padding: 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}

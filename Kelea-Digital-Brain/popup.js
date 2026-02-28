@@ -38,7 +38,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       url: tab?.url || '',
       title: tab?.title || 'Idea rápida',
       category: 'Idea',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      status: "pending" 
     };
 
     const result = await chrome.storage.local.get({ inbox: [] });
@@ -50,6 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Renderizar Inbox a prueba de fallos
+  // Renderizar Inbox a prueba de fallos y con Validación
   async function renderInbox() {
     const result = await chrome.storage.local.get({ inbox: [] });
     inboxList.innerHTML = '';
@@ -73,16 +75,51 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       const categoryHTML = item.category ? `<span class="category">[${item.category}]</span>` : '';
 
+      // Control de estado (Pendiente vs Procesado)
+      const status = item.status || 'pending';
+      const statusBadge = status === 'pending' 
+        ? `<span class="status-badge status-pending">Pendiente</span>` 
+        : `<span class="status-badge status-processed">Procesado</span>`;
+
       div.innerHTML = `
-        <div class="item-meta">
+        <div class="item-meta" style="align-items: center;">
           <span>${typeIcon} ${safeType.toUpperCase()} ${categoryHTML}</span>
-          <span>${date}</span>
+          ${statusBadge}
         </div>
         <p class="item-content">${(item.content || '').substring(0, 80)}${(item.content || '').length > 80 ? '...' : ''}</p>
         <div class="item-tags">${tagsHTML}</div>
+        
+        ${status === 'pending' ? `
+        
+        <div class="edit-form hidden" id="edit-form-${item.id}">
+          <label style="font-size:11px; color:var(--text-muted)">Modificar Categoría:</label>
+          <input type="text" id="edit-cat-${item.id}" value="${item.category || ''}">
+          
+          <label style="font-size:11px; color:var(--text-muted)">Modificar Etiquetas (separadas por coma):</label>
+          <input type="text" id="edit-tags-${item.id}" value="${item.tags ? item.tags.join(', ') : ''}">
+          
+          <button class="btn-small btn-success btn-save-edit" data-id="${item.id}" style="margin-top:4px;">💾 Guardar y Procesar</button>
+        </div>
+        ` : ''}
       `;
       inboxList.appendChild(div);
     });
+  }
+
+  // Función auxiliar para actualizar datos en chrome.storage
+  async function updateItemData(id, newCategory, newTags, newStatus) {
+    const result = await chrome.storage.local.get({ inbox: [] });
+    const updatedInbox = result.inbox.map(item => {
+      if (item.id === id) {
+        if (newCategory !== null) item.category = newCategory;
+        if (newTags !== null) item.tags = newTags;
+        item.status = newStatus;
+      }
+      return item;
+    });
+    
+    await chrome.storage.local.set({ inbox: updatedInbox });
+    renderInbox(); // Recargar la lista visualmente
   }
 
   // Exportar a Markdown blindado
@@ -157,6 +194,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       const oldText = btnClear.innerHTML;
       btnClear.innerHTML = "✨ Inbox limpio";
       setTimeout(() => btnClear.innerHTML = oldText, 2000);
+    }
+  });
+
+  // Lógica para los botones de Aprobar y Editar
+  inboxList.addEventListener('click', async (e) => {
+    const id = e.target.getAttribute('data-id');
+    if (!id) return;
+
+    // Mostrar/Ocultar formulario de edición
+    if (e.target.classList.contains('btn-edit')) {
+      document.getElementById(`edit-form-${id}`).classList.toggle('hidden');
+    }
+
+    // Aprobar directamente la sugerencia de la IA
+    if (e.target.classList.contains('btn-approve')) {
+      await updateItemData(id, null, null, 'processed');
+    }
+
+    // Guardar edición manual
+    if (e.target.classList.contains('btn-save-edit')) {
+      const newCat = document.getElementById(`edit-cat-${id}`).value.trim();
+      const newTagsStr = document.getElementById(`edit-tags-${id}`).value.trim();
+      const newTags = newTagsStr.split(',').map(t => t.trim()).filter(t => t);
+      
+      await updateItemData(id, newCat, newTags, 'processed');
     }
   });
 
