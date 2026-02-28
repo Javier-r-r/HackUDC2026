@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelea Digital Brain - Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>🧠 Kelea Brain</h2>
+      <nav>
+        <button class="nav-btn active" id="nav-inbox">📥 Inbox (Pendientes)</button>
+        <button class="nav-btn" id="nav-processed">📚 Cerebro (Procesados)</button>
+      </nav>
+      <div class="user-info">
+        <p>Usuario Hackathon</p>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header>
+        <h1 id="view-title">Bandeja de Entrada</h1>
+        <button id="btn-refresh" class="btn-primary">🔄 Actualizar</button>
+      </header>
+
+      <div id="loading" class="hidden">Cargando tu conocimiento... ⏳</div>
+      
+      <div id="items-grid" class="items-grid"></div>
+    </main>
+
+    <div id="edit-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>✏️ Editar Nota</h3>
+        <input type="hidden" id="modal-id">
+        
+        <label>Categoría</label>
+        <input type="text" id="modal-category">
+        
+        <label>Etiquetas (separadas por coma)</label>
+        <input type="text" id="modal-tags">
+        
+        <label>Contenido / Resumen</label>
+        <textarea id="modal-content" rows="4"></textarea>
+        
+        <div class="modal-actions">
+          <button id="btn-cancel" class="btn-secondary">Cancelar</button>
+          <button id="btn-save" class="btn-primary">💾 Guardar y Procesar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
