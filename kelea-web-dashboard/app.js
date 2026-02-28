@@ -53,9 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchItems(); // Llamamos a la API al cargar la página
 
   // Navegación
-  navInbox.addEventListener('click', () => switchView('pending', '📥 Bandeja de Entrada', navInbox, navProcessed));
-  navProcessed.addEventListener('click', () => switchView('processed', '📚 Cerebro Digital', navProcessed, navInbox));
-  navGraph.addEventListener('click', () => switchView('graph', '🕸️ Grafo de Conocimiento', navGraph, [navInbox, navProcessed]));
+  navInbox.addEventListener('click', () => switchView('pending', '📥 Bandeja de Entrada', navInbox));
+  navProcessed.addEventListener('click', () => switchView('processed', '📚 Cerebro Digital', navProcessed));
+  navGraph.addEventListener('click', () => switchView('graph', '🕸️ Grafo de Conocimiento', navGraph));
   
   btnRefresh.addEventListener('click', fetchItems);
   
@@ -63,12 +63,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-save').addEventListener('click', saveItem);
 });
 
-function switchView(status, title, activeBtn, inactiveBtn) {
+function switchView(status, title, activeBtn) {
   showingStatus = status;
   viewTitle.textContent = title;
+  
+  // 🔥 TRUCO INFALIBLE: Quitamos la clase 'active' a TODOS los botones primero
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  // Y se la ponemos EXCLUSIVAMENTE al que acabamos de pulsar
   activeBtn.classList.add('active');
-  inactiveBtn.classList.remove('active');
-  // Reseteamos el filtro al cambiar de pestaña
+  
   tagsExpanded = false;
   selectedTags = []; 
   
@@ -77,13 +80,15 @@ function switchView(status, title, activeBtn, inactiveBtn) {
     document.querySelector('.search-container').classList.remove('hidden');
     renderTagFilters(); 
   } else if (status === 'graph') {
-    filterContainer.classList.add('hidden');
-    document.querySelector('.search-container').classList.add('hidden'); // Ocultamos buscador en el grafo
+    // MAGIA AQUÍ: Mostramos los filtros y los renderizamos en el grafo
+    filterContainer.classList.remove('hidden'); 
+    document.querySelector('.search-container').classList.add('hidden'); // Ocultamos el buscador de texto
+    renderTagFilters(); 
   } else {
     filterContainer.classList.add('hidden');
     document.querySelector('.search-container').classList.remove('hidden');
   }
-
+  
   renderItems();
 }
 
@@ -170,16 +175,7 @@ async function updateItemInAPI(filename, updatedData) {
 // ==========================================
 
 function renderItems() {
-  if (showingStatus === 'graph') {
-    itemsGrid.classList.add('hidden');
-    networkGraph.classList.remove('hidden');
-    renderGraph(); // Llamamos a la nueva función del grafo
-    return; // Paramos aquí
-  } else {
-    itemsGrid.classList.remove('hidden');
-    networkGraph.classList.add('hidden');
-    itemsGrid.innerHTML = '';
-  }
+
   itemsGrid.innerHTML = '';
   let filteredItems = currentItems.filter(item => item.status === showingStatus);
 
@@ -203,6 +199,15 @@ function renderItems() {
       const cleanTagsOfItem = tagsArray.map(t => unificarTexto(t));
       return selectedTags.every(selected => cleanTagsOfItem.includes(selected));
     });
+  }
+
+  if (showingStatus === 'graph') {
+    itemsGrid.classList.add('hidden');
+    networkGraph.classList.remove('hidden');
+    
+    // Le pasamos los datos ya filtrados a la función del grafo
+    renderGraph(filteredItems); 
+    return; // Paramos aquí para no pintar las tarjetas
   }
 
   if (filteredItems.length === 0) {
