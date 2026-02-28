@@ -230,6 +230,16 @@ button.btn-primary, button.btn-secondary {
   font-size: 12px;
 }
 
+/* Inputs más estrechos para categoría/etiquetas en el popup */
+.edit-form input,
+input[id^="edit-cat-"],
+input[id^="edit-tags-"],
+#edit-tags-\* {
+  width: 220px !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* Animación de grabando voz */
 .recording {
   background-color: #cf6679 !important;

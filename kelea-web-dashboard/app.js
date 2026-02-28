@@ -96,14 +96,15 @@ async function fetchItems() {
     if (!respuesta.ok) {
         throw new Error(`Error en la red: ${respuesta.status}`); // Añadidas las comillas invertidas
     }
-
     // Guardamos los datos de TU API en nuestra variable global
     let datosCrudos = await respuesta.json();
+
+    console.log("Datos crudos recibidos de la API:", datosCrudos);
     
     // 🔥 EL TRUCO: Asegurarnos de que todos tienen un 'id' para el frontend
     currentItems = datosCrudos.map(item => ({
         ...item,
-        id: item.id || item.filename || item._id || Date.now().toString()
+        id:  item.filename 
     }));
 
     console.log("Notas recuperadas (con ID normalizado):", currentItems);
@@ -365,27 +366,6 @@ window.approveItem = async (id) => {
   console.log("Enviando datos a la API:", updatedData);
 
   // 4. Ejecutamos la petición PUT (que gracias a tu updateItemInAPI ya manda el action: "validate")
-  await updateItemInAPI(id, updatedData);
-}
-
-window.processInline = async (id) => {
-  // 1. Buscamos los inputs específicos de esta tarjeta
-  const catInput = document.getElementById(`edit-cat-${id}`);
-  const tagsInput = document.getElementById(`edit-tags-${id}`);
-  
-  // 2. Extraemos y limpiamos los valores
-  const newCategory = catInput.value.trim();
-  const newTagsStr = tagsInput.value.trim();
-  const newTags = newTagsStr.split(',').map(t => t.trim()).filter(t => t);
-  
-  // 3. Preparamos los datos
-  const updatedData = {
-    category: newCategory || "General",
-    tags: newTags,
-    status: 'processed' // Lo marcamos como validado
-  };
-
-  // 4. Enviamos a la API (usando tu función existente)
   await updateItemInAPI(id, updatedData);
 }
 
