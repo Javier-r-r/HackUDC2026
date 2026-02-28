@@ -53,6 +53,7 @@ class UpdateRequest(BaseModel):
 
 @app.post("/capture")
 async def capture_entry(data: MultiCaptureRequest):
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     saved_files = []
     
     if data.files:
@@ -60,51 +61,31 @@ async def capture_entry(data: MultiCaptureRequest):
             file_path = os.path.join(INBOX_DIR, file.name)
             with open(file_path, "wb") as f:
                 f.write(base64.b64decode(file.base64))
-            
-            # Generamos la nota vinculada al archivo físico
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"note_{timestamp}_{file.name}.md"
-            
-            metadata = {
-                "title": file.name,
-                "date": datetime.now().isoformat(),
-                "source": data.source,
-                "type": "file",
-                "status": "pending",
-                "category": data.category,
-                "tags": data.tags,
-                "summary": data.summary or "Archivo adjunto",
-                "original_file": file.name
-            }
-            
-            md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n{data.content}"
-            with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
-                f.write(md_body)
             saved_files.append(file.name)
+            
+    # Generamos la nota vinculada al archivo físico
+    filename = f"note_{timestamp}.md"
+    filepath = os.path.join(INBOX_DIR, filename)
+    
+    metadata = {
+        "title": file.name,
+        "date": datetime.now().isoformat(),
+        "source": data.source,
+        "type": "collection" if len(saved_files) > 1 else "file",
+        "status": "pending",
+        "category": data.category,
+        "tags": data.tags,
+        "summary": data.summary or "Archivo adjunto",
+        "attached_files": saved_files
+    }
 
-    # Caso B: Si es una captura de texto/página (Background.js)
-    elif data.content:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"note_text_{timestamp}.md"
-        
-        metadata = {
-            "title": "Captura rápida",
-            "date": datetime.now().isoformat(),
-            "source": data.source,
-            "type": "text",
-            "status": "pending",
-            "category": data.category,
-            "tags": data.tags,
-            "summary": data.summary or "Sin resumen",
-            "original_file": None
-        }
-        
-        md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n{data.content}"
-        with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
-            f.write(md_body)
-        saved_files.append(filename)
+    file_links = "\n".join([f"* [{f}](../inbox/{f})" for f in saved_files])
+    md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n## Archivos Adjuntos:\n{file_links}\n\n## Notas:\n{data.content}" 
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(md_body)
 
-    return {"status": "success", "processed": saved_files}
+    return {"status": "success", "note": filename, "files_saved": saved_files}
 
 @app.post("/inbox")
 async def save_direct_to_inbox(item: dict):
