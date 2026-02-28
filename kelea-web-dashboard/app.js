@@ -1,5 +1,5 @@
 // 1. Ponemos la URL real de tu API
-const API_BASE_URL = 'http://192.168.1.10:8000/inbox';
+const API_BASE_URL = 'http://localhost:8000/inbox';
 
 // Estado local
 let currentItems = [];
@@ -7,9 +7,11 @@ let showingStatus = 'pending'; // 'pending' o 'processed'
 
 // Elementos del DOM
 const itemsGrid = document.getElementById('items-grid');
+const networkGraph = document.getElementById('network-graph'); // NUEVO
 const btnRefresh = document.getElementById('btn-refresh');
 const navInbox = document.getElementById('nav-inbox');
 const navProcessed = document.getElementById('nav-processed');
+const navGraph = document.getElementById('nav-graph'); // NUEVO
 const viewTitle = document.getElementById('view-title');
 const loading = document.getElementById('loading');
 let selectedTags = [];
@@ -18,6 +20,7 @@ const filterContainer = document.getElementById('filter-container')
 const inboxBadge = document.getElementById('inbox-badge');
 let searchQuery = ''; // Guardará el texto del buscador
 const searchInput = document.getElementById('search-input');
+const btnSemanticSearch = document.getElementById('btn-semantic-search');
 
 // Modal
 const modal = document.getElementById('edit-modal');
@@ -41,18 +44,35 @@ function unificarTexto(texto) {
 
 document.addEventListener('DOMContentLoaded', () => {
   // Escuchador para la barra de búsqueda (se ejecuta en tiempo real al teclear)
-  if (searchInput) {
+if (searchInput) {
     searchInput.addEventListener('input', (e) => {
-      // Usamos nuestra función mágica para quitar acentos y mayúsculas
       searchQuery = unificarTexto(e.target.value); 
-      renderItems(); // Redibujamos las tarjetas al instante
+      if (searchQuery === '') {
+        fetchItems(); // Recarga todo si vacías la barra
+      } else {
+        renderItems(); 
+      }
     });
   }
+
+  // BOTÓN DE BÚSQUEDA IA
+  if (btnSemanticSearch) {
+    btnSemanticSearch.addEventListener('click', async () => {
+      const query = searchInput.value.trim();
+      if (!query) {
+        alert("Escribe una idea, concepto o pregunta en la barra para buscar con IA.");
+        return;
+      }
+      await realizarBusquedaSemantica(query);
+    });
+  }
+
   fetchItems(); // Llamamos a la API al cargar la página
 
   // Navegación
-  navInbox.addEventListener('click', () => switchView('pending', '📥 Bandeja de Entrada', navInbox, navProcessed));
-  navProcessed.addEventListener('click', () => switchView('processed', '📚 Cerebro Digital', navProcessed, navInbox));
+  navInbox.addEventListener('click', () => switchView('pending', '📥 Bandeja de Entrada', navInbox));
+  navProcessed.addEventListener('click', () => switchView('processed', '📚 Cerebro Digital', navProcessed));
+  navGraph.addEventListener('click', () => switchView('graph', '🕸️ Grafo de Conocimiento', navGraph));
   
   btnRefresh.addEventListener('click', fetchItems);
   
@@ -60,21 +80,32 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-save').addEventListener('click', saveItem);
 });
 
-function switchView(status, title, activeBtn, inactiveBtn) {
+function switchView(status, title, activeBtn) {
   showingStatus = status;
   viewTitle.textContent = title;
+  
+  // 🔥 TRUCO INFALIBLE: Quitamos la clase 'active' a TODOS los botones primero
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  // Y se la ponemos EXCLUSIVAMENTE al que acabamos de pulsar
   activeBtn.classList.add('active');
-  inactiveBtn.classList.remove('active');
-  // Reseteamos el filtro al cambiar de pestaña
+  
   tagsExpanded = false;
   selectedTags = []; 
   
   if (status === 'processed') {
     filterContainer.classList.remove('hidden');
-    renderTagFilters(); // Dibujamos los filtros
+    document.querySelector('.search-container').classList.remove('hidden');
+    renderTagFilters(); 
+  } else if (status === 'graph') {
+    // MAGIA AQUÍ: Ocultamos los filtros y renderizamos el grafo
+    filterContainer.classList.add('hidden'); 
+    document.querySelector('.search-container').classList.add('hidden'); // Ocultamos el buscador de texto
+    // renderTagFilters(); // Ya no renderizamos filtros en grafo
   } else {
     filterContainer.classList.add('hidden');
+    document.querySelector('.search-container').classList.remove('hidden');
   }
+  
   renderItems();
 }
 
@@ -119,7 +150,7 @@ async function fetchItems() {
     console.error("No se pudo recuperar el inbox:", error);
     itemsGrid.innerHTML = `<p style="color:#cf6679; text-align:center;">
       ❌ Error al conectar con la API.<br><br>
-      Asegúrate de que el servidor en 192.168.1.10:8000 está encendido.
+      Asegúrate de que el servidor en localhost:8000 está encendido.
     </p>`;
   } finally {
     loading.classList.add('hidden');
@@ -161,6 +192,7 @@ async function updateItemInAPI(filename, updatedData) {
 // ==========================================
 
 function renderItems() {
+
   itemsGrid.innerHTML = '';
   let filteredItems = currentItems.filter(item => item.status === showingStatus);
 
@@ -184,6 +216,19 @@ function renderItems() {
       const cleanTagsOfItem = tagsArray.map(t => unificarTexto(t));
       return selectedTags.every(selected => cleanTagsOfItem.includes(selected));
     });
+  }
+
+  if (showingStatus === 'graph') {
+    itemsGrid.classList.add('hidden');
+    networkGraph.classList.remove('hidden');
+    
+    // Le pasamos los datos ya filtrados a la función del grafo
+    renderGraph(filteredItems); 
+    return; // Paramos aquí para no pintar las tarjetas
+  } else {
+    // Si NO es el grafo, asegurarnos de que la rejilla se ve y el grafo se oculta
+    itemsGrid.classList.remove('hidden');
+    networkGraph.classList.add('hidden');
   }
 
   if (filteredItems.length === 0) {
@@ -596,3 +641,122 @@ window.exportItemToMD = (id) => {
     alert("Hubo un error al exportar la nota.");
   }
 };
+
+// ==========================================
+// RENDERIZADO DEL GRAFO (vis-network)
+// ==========================================
+function renderGraph() {
+  const processedItems = currentItems.filter(item => item.status === 'processed');
+  const nodesArray = [];
+  const edgesArray = [];
+  const tagNodesAdded = new Set();
+
+  processedItems.forEach(item => {
+    // 1. Crear el nodo de la nota
+    const shortTitle = (item.title || 'Nota').substring(0, 20) + (item.title?.length > 20 ? '...' : '');
+    nodesArray.push({
+      id: item.id,
+      label: shortTitle,
+      title: item.summary || item.content || 'Sin contenido', // Tooltip
+      shape: 'box',
+      color: { background: '#1e1e1e', border: '#bb86fc' },
+      font: { color: '#e0e0e0' }
+    });
+
+    // 2. Crear los nodos de las etiquetas y unirlos a la nota
+    let tags = [];
+    if (Array.isArray(item.tags)) tags = item.tags;
+    else if (typeof item.tags === 'string') tags = item.tags.split(',').map(t => t.trim()).filter(Boolean);
+
+    tags.forEach(tag => {
+      const tagLimpio = unificarTexto(tag);
+      if (!tagLimpio) return;
+      
+      const tagId = 'tag_' + tagLimpio;
+      
+      // Creamos la etiqueta solo si no existe ya
+      if (!tagNodesAdded.has(tagId)) {
+        nodesArray.push({
+          id: tagId,
+          label: '#' + tagLimpio,
+          shape: 'dot',
+          size: 15,
+          color: { background: '#cf6679', border: '#cf6679' },
+          font: { color: '#e0e0e0', size: 14, bold: true }
+        });
+        tagNodesAdded.add(tagId);
+      }
+
+      // Conectamos la nota con la etiqueta
+      edgesArray.push({
+        from: item.id,
+        to: tagId,
+        color: { color: '#555' }
+      });
+    });
+  });
+
+  const data = {
+    nodes: new vis.DataSet(nodesArray),
+    edges: new vis.DataSet(edgesArray)
+  };
+
+  const options = {
+    physics: {
+      barnesHut: { gravitationalConstant: -3000, centralGravity: 0.3, springLength: 150 }
+    },
+    interaction: { hover: true },
+    nodes: { borderWidth: 2, shadow: true },
+    edges: { smooth: { type: 'continuous' } }
+  };
+
+  const network = new vis.Network(networkGraph, data, options);
+
+  // Abrir modal al hacer doble clic en una nota
+  network.on("doubleClick", function (params) {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0];
+      if (!nodeId.startsWith('tag_')) { // Solo abrimos si no es un tag
+        openModal(nodeId);
+      }
+    }
+  });
+}
+
+// ==========================================
+// BÚSQUEDA SEMÁNTICA VECTORIAL (RAG)
+// ==========================================
+async function realizarBusquedaSemantica(texto) {
+    loading.classList.remove('hidden');
+    try {
+        const searchUrl = API_BASE_URL.replace('/inbox', '') + `/search?query=${encodeURIComponent(texto)}`;
+        const respuesta = await fetch(searchUrl);
+        
+        if (!respuesta.ok) throw new Error("Error en la búsqueda semántica");
+        
+        const resultados = await respuesta.json();
+        
+        if (resultados.length === 0) {
+            itemsGrid.innerHTML = '<p style="color:var(--text-muted)">No se encontró información relacionada en tu Cerebro Digital.</p>';
+            return;
+        }
+
+        // Machacamos temporalmente currentItems con los resultados de la IA ordenados por relevancia
+        currentItems = resultados.map(item => ({ 
+            ...item, 
+            id: item.filename,
+            // Forzamos el status actual para que renderItems no los oculte
+            status: showingStatus === 'graph' ? 'processed' : showingStatus
+        }));
+        
+        // Limpiamos el texto del buscador estándar para que no bloquee el renderizado
+        searchQuery = '';
+        renderItems();
+        
+    } catch (e) {
+        console.error("Error en búsqueda semántica", e);
+        alert("Error al conectar con el motor de IA.");
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
