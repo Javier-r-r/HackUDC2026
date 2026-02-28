@@ -16,8 +16,13 @@
 
   <div id="view-capture" class="view active">
     <textarea id="quick-note" placeholder="Escribe una idea brillante..."></textarea>
-    <button id="btn-save" class="btn-primary">Guardar Idea</button>
-    <p id="status-msg" class="hidden">¡Guardado en el Inbox!</p>
+    
+    <div style="display: flex; gap: 8px;">
+      <button id="btn-save" class="btn-primary" style="flex: 1;">📝 Guardar Idea</button>
+      <button id="btn-mic" class="btn-secondary" style="margin-top: 0; width: auto; padding: 10px 15px;" title="Grabar nota de voz">🎙️</button>
+    </div>
+    
+    <p id="status-msg" class="hidden" style="margin-top: 12px; font-weight: bold; text-align: center;"></p>
   </div>
 
   <div id="view-inbox" class="view hidden">
