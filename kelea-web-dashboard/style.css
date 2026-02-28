@@ -161,3 +161,26 @@ header {
 .hidden {
   display: none !important;
 }
+
+/* Estilos para el Modal de Lectura */
+.view-modal-content {
+  width: 600px; /* Más ancho para leer bien */
+  max-width: 90%;
+  max-height: 85vh; /* Si el texto es larguísimo, no se sale de la pantalla */
+  overflow-y: auto; /* Añade scroll interno si hace falta */
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.full-content {
+  white-space: pre-wrap; /* Mágico: respeta los saltos de línea reales de tu texto */
+  line-height: 1.6;
+  font-size: 15px;
+  color: #ccc;
+}
