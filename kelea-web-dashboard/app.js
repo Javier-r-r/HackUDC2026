@@ -293,8 +293,9 @@ function createAndAppendCard(item) {
     ` : ''}
         
     <div class="card-actions" style="margin-top: 15px; display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px;">
-      <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); deleteItem('${item.id}')" style="color: #cf6679; border-color: rgba(207, 102, 121, 0.3); background: transparent;">🗑️ Borrar</button>
+      ${status === 'processed' ? `<button class="btn-secondary btn-sm" onclick="event.stopPropagation(); exportItemToMD('${item.id}')" style="color: #bb86fc; border-color: rgba(187, 134, 252, 0.3); background: transparent;">⬇️ Exportar MD</button>` : ''}
       ${status === 'pending' ? `<button class="btn-primary btn-sm" onclick="event.stopPropagation(); approveItem('${item.id}')">✅ Confirmar y Enviar al Cerebro</button>` : ''}
+      <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); deleteItem('${item.id}')" style="color: #cf6679; border-color: rgba(207, 102, 121, 0.3); background: transparent;">🗑️ Borrar</button>
     </div>
   `;
   
@@ -542,3 +543,56 @@ window.updateNotificationBadge = () => {
     inboxBadge.classList.remove('pulse');
   }
 }
+
+window.exportItemToMD = (id) => {
+  // 1. Buscamos los datos completos de la nota
+  const item = currentItems.find(i => i.id === id);
+  if (!item) return;
+
+  // 2. Preparamos las variables con control de errores (fallbacks)
+  const type = (item.type || 'nota').toUpperCase();
+  const title = item.title || 'Sin título';
+  const url = item.url || 'Sin enlace';
+  const category = item.category || 'Sin categoría';
+  
+  let tagsArray = [];
+  if (Array.isArray(item.tags)) tagsArray = item.tags;
+  else if (typeof item.tags === 'string') tagsArray = item.tags.split(',').map(t => t.trim()).filter(Boolean);
+  const tagsStr = tagsArray.length > 0 ? tagsArray.map(t => `#${t}`).join(' ') : '';
+  
+  const date = item.date ? new Date(item.date).toLocaleString() : new Date().toLocaleString();
+  const content = item.content || item.summary || 'Sin contenido';
+
+  // 3. Montamos el contenido en formato Markdown bonito
+  let mdContent = `# 🧠 Kelea Digital Brain - Nota Exportada\n\n`;
+  mdContent += `## [${type}] ${title}\n`;
+  mdContent += `- **Fecha:** ${date}\n`;
+  mdContent += `- **Categoría:** ${category}\n`;
+  if (tagsStr) mdContent += `- **Etiquetas:** ${tagsStr}\n`;
+  mdContent += `- **Fuente:** ${url !== 'Sin enlace' ? `[Ver enlace original](${url})` : 'Sin enlace'}\n\n`;
+  mdContent += `### Contenido:\n\n> ${content}\n\n`;
+  if (item.personalComment) {
+    mdContent += `\n**Comentario Personal:**\n${item.personalComment}\n\n`;
+  }
+  mdContent += `---\n`;
+
+  // 4. Forzamos la descarga del archivo en el navegador
+  try {
+    const blob = new Blob([mdContent], { type: 'text/markdown' });
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    
+    // Limpiamos el título para usarlo como nombre de archivo sin que de errores de Windows/Mac
+    const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 30);
+    a.download = `Nota_${safeTitle}_${Date.now()}.md`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objUrl);
+  } catch (e) {
+    console.error("Error al exportar a MD:", e);
+    alert("Hubo un error al exportar la nota.");
+  }
+};
