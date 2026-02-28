@@ -8,6 +8,9 @@
     "storage",
     "activeTab"
   ],
+  "host_permissions": [
+    "https://api.groq.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -15,6 +18,7 @@
     "default_popup": "popup.html",
     "default_title": "Abrir Inbox"
   },
+  "options_page": "options.html",
   "icons": {
     "48": "icon.png",
     "128": "icon.png"
