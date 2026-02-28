@@ -4,12 +4,20 @@ import yaml
 from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
 
 # --- CONFIGURACIÓN ---
 app = FastAPI(title="Kelea Digital Brain API")
-#client = Groq(api_key="")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],     # ID de la extensión de Chrome
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Directorios de almacenamiento (Formatos abiertos) [cite: 113, 137]
 BASE_DIR = "digital_brain"
@@ -34,24 +42,33 @@ class ProcessRequest(BaseModel):
 
 # --- LÓGICA DE IA (GROQ) ---
 def get_ai_metadata(content: str):
-    """Analiza el contenido y sugiere clasificación [cite: 187, 191]"""
+    truncated_content = content[:4000]
+    
+    # Prompt más imperativo para asegurar el resumen
     prompt = f"""
-    Analiza esta entrada de un 'Digital Brain'. 
-    Devuelve un JSON con:
-    - 'category': Una de (Proyectos, Áreas, Recursos, Archivo) [cite: 135]
-    - 'tags': 3 etiquetas técnicas.
-    - 'summary': Resumen de 10 palabras.
-    CONTENIDO: {content}
+            Eres un experto en Personal Knowledge Management (PKM). 
+            Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos:
+            1. "category": Una sola palabra que defina el área (ej. Programación, Marketing, Filosofía, Herramienta).
+            2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas.
+            Responde SOLO con el JSON validado.`
+    {truncated_content}
     """
+    
     try:
         completion = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.1-8b-instant", # Modelo más robusto
+            messages=[
+                {"role": "system", "content": "Eres un asistente que solo responde en JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
             response_format={"type": "json_object"}
         )
         return json.loads(completion.choices[0].message.content)
-    except:
-        return {"category": "Archivo", "tags": ["sin-etiqueta"], "summary": "Sin resumen"}
+    except Exception as e:
+        # Imprime el error real en la terminal para debuggear
+        print(f"--- ERROR EN GROQ ---: {e}")
+        return {"category": "Archivo", "tags": ["error-ia"], "summary": "Error en el procesamiento de la nota"}
 
 # --- ENDPOINTS ---
 
@@ -59,7 +76,7 @@ def get_ai_metadata(content: str):
 async def capture_entry(data: CaptureRequest):
     """Punto único de captura sin fricción [cite: 117]"""
     # 1. Procesamiento IA en segundo plano [cite: 162]
-    ai_suggestions = get_ai_metadata(data.content)
+    ai_suggestions = get_ai_metadata(data.content)    
     
     # 2. Creación de Metadatos (Frontmatter) [cite: 124]
     metadata = {
@@ -67,8 +84,10 @@ async def capture_entry(data: CaptureRequest):
         "date": datetime.now().isoformat(),
         "source": data.source,
         "type": data.entry_type,
-        "status": "pending", # [cite: 181]
-        "ai_proposal": ai_suggestions
+        "status": "pending",
+        "category": ai_suggestions.get("category", "Archivo"),
+        "tags": ai_suggestions.get("tags", []),
+        "summary": ai_suggestions.get("summary", "Sin resumen")
     }
     
     # 3. Guardar como Markdown local [cite: 137]
@@ -110,7 +129,3 @@ async def process_note(req: ProcessRequest):
     # Aquí podrías actualizar los tags/categoría en el archivo antes de moverlo
     os.rename(source_path, dest_path)
     return {"message": f"Nota movida a {req.category}"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
