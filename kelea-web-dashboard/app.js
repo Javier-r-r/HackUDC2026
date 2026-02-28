@@ -272,6 +272,7 @@ function createAndAppendCard(item) {
     ` : ''}
         
     <div class="card-actions" style="margin-top: 15px; display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px;">
+      <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); deleteItem('${item.id}')" style="color: #cf6679; border-color: rgba(207, 102, 121, 0.3); background: transparent;">🗑️ Borrar</button>
       ${status === 'pending' ? `<button class="btn-primary btn-sm" onclick="event.stopPropagation(); approveItem('${item.id}')">✅ Confirmar y Enviar al Cerebro</button>` : ''}
     </div>
   `;
@@ -452,3 +453,74 @@ window.toggleTags = () => {
   tagsExpanded = !tagsExpanded; // Cambia entre verdadero y falso
   renderTagFilters(); // Redibuja los botones
 };
+
+// ==========================================
+// SISTEMA DE ELIMINACIÓN Y DUPLICADOS
+// ==========================================
+
+// Función base para borrar una nota llamando a la API
+window.deleteItem = async (id, skipConfirm = false) => {
+  if (!skipConfirm && !confirm("¿Seguro que quieres eliminar esta nota de forma permanente?")) return;
+  
+  try {
+    const safeFilename = encodeURIComponent(id);
+    const response = await fetch(`${API_BASE_URL}/${safeFilename}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) throw new Error("Error al borrar en el servidor");
+    
+    // Solo recargamos si es un borrado manual único
+    if (!skipConfirm) {
+      console.log(`🗑️ Nota ${id} eliminada`);
+      await fetchItems();
+    }
+  } catch (error) {
+    console.error("❌ Error al eliminar:", error);
+  }
+}
+
+// Función MÁGICA para detectar y limpiar duplicados
+window.cleanDuplicates = async () => {
+  // Vamos a usar el 'título' como identificador de duplicados. 
+  // (Si capturas la misma web 2 veces, tendrá el mismo título).
+  const seenTitles = new Set();
+  const duplicateIds = [];
+
+  currentItems.forEach(item => {
+    // Normalizamos el título para evitar fallos por mayúsculas o espacios
+    const titleKey = item.title ? unificarTexto(item.title) : null;
+    
+    if (!titleKey) return; // Si no tiene título, lo ignoramos
+
+    if (seenTitles.has(titleKey)) {
+      // Si ya hemos visto este título, es un duplicado
+      duplicateIds.push(item.id);
+    } else {
+      // Si es la primera vez que lo vemos, lo registramos
+      seenTitles.add(titleKey);
+    }
+  });
+
+  // Avisamos al usuario
+  if (duplicateIds.length === 0) {
+    alert("✨ ¡Tu cerebro está limpio! No se han encontrado notas duplicadas.");
+    return;
+  }
+
+  const confirmacion = confirm(`🧹 Se han encontrado ${duplicateIds.length} notas duplicadas.\n\nEl sistema mantendrá la versión más antigua y borrará las copias. ¿Deseas proceder?`);
+  
+  if (confirmacion) {
+    // Ponemos el mensaje de "Cargando" para que el usuario espere
+    document.getElementById('loading').classList.remove('hidden');
+    
+    // Borramos los duplicados uno por uno (silenciosamente)
+    for (const id of duplicateIds) {
+      await deleteItem(id, true); // true = skipConfirm
+    }
+    
+    // Recargamos la interfaz
+    await fetchItems();
+    alert("✅ Limpieza de duplicados completada con éxito.");
+  }
+}
