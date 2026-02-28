@@ -17,8 +17,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     timestamp: new Date().toISOString(),
     url: info.pageUrl || tab.url,
     title: tab.title || "Página sin título",
-    category: "Inbox", // Categoría por defecto
-    tags: []
+    category: "Inbox", 
+    tags: [],
+    status: "pending" 
   };
 
   if (info.menuItemId === "capture-selection") {
