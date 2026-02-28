@@ -60,7 +60,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => statusMsg.classList.add('hidden'), 2000);
   });
 
-  // Renderizar Inbox a prueba de fallos
   // Renderizar Inbox a prueba de fallos y con Validación
   async function renderInbox() {
     const result = await chrome.storage.local.get({ inbox: [] });
@@ -90,7 +89,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const statusBadge = status === 'pending' 
         ? `<span class="status-badge status-pending">Pendiente</span>` 
         : `<span class="status-badge status-processed">Procesado</span>`;
-
+      const commentHTML = item.personalComment ? `<p style="font-size: 12px; color: var(--primary); font-style: italic; margin-top: 6px; background: #2a1f3d; padding: 6px; border-radius: 4px;">💬 ${item.personalComment}</p>` : '';
+      
       div.innerHTML = `
         <div class="item-meta" style="align-items: center;">
           <span>${typeIcon} ${safeType.toUpperCase()} ${categoryHTML}</span>
@@ -108,6 +108,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           <label style="font-size:11px; color:var(--text-muted)">Modificar Etiquetas (separadas por coma):</label>
           <input type="text" id="edit-tags-${item.id}" value="${item.tags ? item.tags.join(', ') : ''}">
           
+          <label style="font-size:11px; color:var(--text-muted)">Comentario personal:</label>
+          <input type="text" id="edit-comment-${item.id}" value="${item.personalComment || ''}" placeholder="Añade un comentario personal...">
+
           <button class="btn-small btn-success btn-save-edit" data-id="${item.id}" style="margin-top:4px;">💾 Guardar y Procesar</button>
         </div>
         ` : ''}
@@ -117,12 +120,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Función auxiliar para actualizar datos en chrome.storage
-  async function updateItemData(id, newCategory, newTags, newStatus) {
+  async function updateItemData(id, newCategory, newTags, newStatus, newComment = null) {
     const result = await chrome.storage.local.get({ inbox: [] });
     const updatedInbox = result.inbox.map(item => {
       if (item.id === id) {
         if (newCategory !== null) item.category = newCategory;
         if (newTags !== null) item.tags = newTags;
+        if (newComment !== null) item.personalComment = newComment;
         item.status = newStatus;
       }
       return item;
@@ -264,6 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newCat = document.getElementById(`edit-cat-${id}`).value.trim();
       const newTagsStr = document.getElementById(`edit-tags-${id}`).value.trim();
       const newTags = newTagsStr.split(',').map(t => t.trim()).filter(t => t);
+      const newComment = document.getElementById(`edit-comment-${id}`).value.trim();
       
       await updateItemData(id, newCat, newTags, 'processed');
     }
@@ -271,6 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnSave.addEventListener('click', async () => {
     const text = quickNote.value.trim();
+    const comment = document.getElementById('quick-comment').value.trim();
     if (!text) return;
 
     statusMsg.innerText = "🧠 Procesando idea...";
@@ -284,6 +290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       id: Date.now().toString(),
       type: 'idea',
       content: text,
+      personalComment: comment,
       url: tab?.url || '',
       title: tab?.title || 'Idea rápida',
       category: aiData ? aiData.category : 'Idea',
@@ -296,6 +303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.storage.local.set({ inbox: [newItem, ...result.inbox] });
 
     quickNote.value = '';
+    document.getElementById('quick-comment').value = '';
     statusMsg.innerText = "✅ ¡Idea guardada!";
     statusMsg.style.color = "#4caf50";
     renderInbox();
