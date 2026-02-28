@@ -16,6 +16,8 @@ let selectedTags = [];
 let tagsExpanded = false;
 const filterContainer = document.getElementById('filter-container')
 const inboxBadge = document.getElementById('inbox-badge');
+let searchQuery = ''; // Guardará el texto del buscador
+const searchInput = document.getElementById('search-input');
 
 // Modal
 const modal = document.getElementById('edit-modal');
@@ -38,6 +40,14 @@ function unificarTexto(texto) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Escuchador para la barra de búsqueda (se ejecuta en tiempo real al teclear)
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      // Usamos nuestra función mágica para quitar acentos y mayúsculas
+      searchQuery = unificarTexto(e.target.value); 
+      renderItems(); // Redibujamos las tarjetas al instante
+    });
+  }
   fetchItems(); // Llamamos a la API al cargar la página
 
   // Navegación
@@ -153,23 +163,30 @@ function renderItems() {
   itemsGrid.innerHTML = '';
   let filteredItems = currentItems.filter(item => item.status === showingStatus);
 
-  // Lógica de filtrado por etiqueta (solo para el Cerebro)
+  // 🔍 1. LÓGICA DE BÚSQUEDA POR TÍTULO (En tiempo real)
+  if (searchQuery !== '') {
+    filteredItems = filteredItems.filter(item => {
+      // Limpiamos el título de la nota actual (sin acentos, en minúsculas)
+      const titleLimpio = unificarTexto(item.title || '');
+      // Comprobamos si el título incluye lo que el usuario ha escrito
+      return titleLimpio.includes(searchQuery);
+    });
+  }
+
+  // 🏷️ 2. LÓGICA DE FILTRADO MÚLTIPLE (Debe contener TODAS las etiquetas seleccionadas)
   if (showingStatus === 'processed' && selectedTags.length > 0) {
     filteredItems = filteredItems.filter(item => {
       let tagsArray = [];
       if (Array.isArray(item.tags)) tagsArray = item.tags;
       else if (typeof item.tags === 'string') tagsArray = item.tags.split(',');
       
-      // Limpiamos las etiquetas de la nota actual para compararlas bien
       const cleanTagsOfItem = tagsArray.map(t => unificarTexto(t));
-      
-      // MÁGIA: .every() asegura que la nota tiene TODAS las etiquetas que has marcado
       return selectedTags.every(selected => cleanTagsOfItem.includes(selected));
     });
   }
-  
+
   if (filteredItems.length === 0) {
-    itemsGrid.innerHTML = '<p style="color:var(--text-muted)">No hay elementos en esta vista.</p>';
+    itemsGrid.innerHTML = '<p style="color:var(--text-muted)">No se han encontrado notas con estos filtros.</p>';
     return;
   }
 
