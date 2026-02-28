@@ -22,7 +22,11 @@
     <main class="content">
       <header>
         <h1 id="view-title">📥 Bandeja de Entrada</h1>
-        <button id="btn-refresh" class="btn-primary">🔄 Actualizar</button>
+        <div class="header-actions">
+            <button id="btn-dedupe" class="btn-secondary" onclick="cleanDuplicates()" style="margin-right: 10px; border-color: #cf6679; color: #cf6679;">🧹 Limpiar Duplicados</button>
+            
+            <button id="btn-refresh" class="btn-primary">🔄 Actualizar</button>
+        </div>
       </header>
 
       <div id="loading" class="hidden">Cargando tu conocimiento... ⏳</div>
