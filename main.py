@@ -29,87 +29,96 @@ for folder in [INBOX_DIR, BRAIN_DIR]:
     os.makedirs(folder, exist_ok=True)
 
 # --- MODELOS DE DATOS ---
-class CaptureRequest(BaseModel):
-    content: str
-    source: str
-    entry_type: str
-    title: str
-    file_data: Optional[str] = None # Base64 del archivo
-    file_name: Optional[str] = None
+class FileData(BaseModel):
+    name: str
+    base64: str
 
-class ProcessRequest(BaseModel):
-    filename: str
-    action: str # "validate" o "archive"
-    category: str
-    tags: List[str]
+class MultiCaptureRequest(BaseModel):
+    content: Optional[str] = ""
+    source: Optional[str] = "Chrome Extension"
+    files: List[FileData] = []
+    # Añadimos los campos que procesa la IA en el background.js
+    category: Optional[str] = "Inbox"
+    tags: Optional[List[str]] = []
+    summary: Optional[str] = "AAAA"
 
-# --- LÓGICA DE IA (GROQ) ---
-def get_ai_metadata(content: str):
-    truncated_content = content[:4000]
-    
-    # Prompt más imperativo para asegurar el resumen
-    prompt = f"""
-            Eres un experto en Personal Knowledge Management (PKM). 
-            Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos:
-            1. "category": Una sola palabra que defina el área (ej. Programación, Marketing, Filosofía, Herramienta).
-            2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas.
-            3. "summary": resumen de máximo 10 palabras
-            Responde SOLO con el JSON validado.`
-    {truncated_content}
-    """
-    
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Modelo más robusto
-            messages=[
-                {"role": "system", "content": "Eres un asistente que solo responde en JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,
-            response_format={"type": "json_object"}
-        )
-        return json.loads(completion.choices[0].message.content)
-    except Exception as e:
-        # Imprime el error real en la terminal para debuggear
-        print(f"--- ERROR EN GROQ ---: {e}")
-        return {"category": "Archivo", "tags": ["error-ia"], "summary": "Error en el procesamiento de la nota"}
+class UpdateRequest(BaseModel):
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
+    status: Optional[str] = None
+    action: Optional[str] = None
+
 
 # --- ENDPOINTS ---
 
 @app.post("/capture")
-async def capture_entry(data: CaptureRequest):
-    # Si viene un archivo, lo guardamos físicamente
-    if data.file_data and data.file_name:
-        file_path = os.path.join(INBOX_DIR, data.file_name)
-        with open(file_path, "wb") as f:
-            f.write(base64.b64decode(data.file_data))
-        data.content += f"\n\n[Archivo guardado localmente: {data.file_name}]"
-    """Punto único de captura sin fricción [cite: 117]"""
-    # 1. Procesamiento IA en segundo plano [cite: 162]
-    ai_suggestions = get_ai_metadata(data.content)    
+async def capture_entry(data: MultiCaptureRequest):
+    saved_files = []
     
-    # 2. Creación de Metadatos (Frontmatter) [cite: 124]
-    metadata = {
-        "title": data.title,
-        "date": datetime.now().isoformat(),
-        "source": data.source,
-        "type": data.entry_type,
-        "status": "pending",
-        "category": ai_suggestions.get("category", "Archivo"),
-        "tags": ai_suggestions.get("tags", []),
-        "summary": ai_suggestions.get("summary", "Sin resumen")
-    }
+    if data.files:
+        for file in data.files:
+            file_path = os.path.join(INBOX_DIR, file.name)
+            with open(file_path, "wb") as f:
+                f.write(base64.b64decode(file.base64))
+            
+            # Generamos la nota vinculada al archivo físico
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"note_{timestamp}_{file.name}.md"
+            
+            metadata = {
+                "title": file.name,
+                "date": datetime.now().isoformat(),
+                "source": data.source,
+                "type": "file",
+                "status": "pending",
+                "category": data.category,
+                "tags": data.tags,
+                "summary": data.summary or "Archivo adjunto",
+                "original_file": file.name
+            }
+            
+            md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n{data.content}"
+            with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
+                f.write(md_body)
+            saved_files.append(file.name)
+
+    # Caso B: Si es una captura de texto/página (Background.js)
+    elif data.content:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"note_text_{timestamp}.md"
+        
+        metadata = {
+            "title": "Captura rápida",
+            "date": datetime.now().isoformat(),
+            "source": data.source,
+            "type": "text",
+            "status": "pending",
+            "category": data.category,
+            "tags": data.tags,
+            "summary": data.summary or "Sin resumen",
+            "original_file": None
+        }
+        
+        md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n{data.content}"
+        with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
+            f.write(md_body)
+        saved_files.append(filename)
+
+    return {"status": "success", "processed": saved_files}
+
+@app.post("/inbox")
+async def save_direct_to_inbox(item: dict):
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    item_type = item.get("type", "generic")
+    filename = f"note_{item_type}_{timestamp}.md"
     
-    # 3. Guardar como Markdown local [cite: 137]
-    filename = f"note_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    filepath = os.path.join(INBOX_DIR, filename)
+    # El diccionario 'item' que envía JS ya tiene toda la estructura perfecta
+    md_body = f"---\n{yaml.dump(item)}---\n\n# {item.get('title', 'Sin título')}\n\n{item.get('summary', item.get('content', ''))}"
     
-    md_body = f"---\n{yaml.dump(metadata)}---\n\n# {ai_suggestions['summary']}\n\n{data.content}"
-    
-    with open(filepath, "w", encoding="utf-8") as f:
+    with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
         f.write(md_body)
         
-    return {"message": "Guardado en Inbox", "file": filename, "proposal": ai_suggestions}
+    return {"status": "success", "filename": filename}
 
 @app.get("/inbox")
 async def list_inbox():
@@ -124,14 +133,19 @@ async def list_inbox():
                 if len(parts) >= 3:
                     meta = yaml.safe_load(parts[1])
                     meta["filename"] = f
+
+                    # 1. Verificamos si la nota tiene un archivo original asociado
+                    original_name = meta.get("original_file")
+                    if original_name:
+                        file_path = os.path.join(INBOX_DIR, original_name)
+                        # 2. Si el archivo existe físicamente, generamos la URL
+                        if os.path.exists(file_path):
+                            meta["download_url"] = f"http://localhost:8000/download/{original_name}"
+                        else:
+                            meta["download_url"] = None
+
                     files.append(meta)
     return files
-
-# Nuevo modelo de datos para actualizar
-class UpdateRequest(BaseModel):
-    category: str
-    tags: List[str]
-    action: Optional[str] = None # Si enviamos "validate", la moveremos
 
 # El nuevo endpoint RESTful
 @app.put("/inbox/{filename}")
@@ -153,6 +167,7 @@ async def update_inbox_note(filename: str, req: UpdateRequest):
         # Actualizamos los datos
         meta["category"] = req.category
         meta["tags"] = req.tags
+        meta["status"] = req.status
         
         # MAGIA AQUÍ: Si la acción es validate, cambiamos el estado, pero NO movemos el archivo
         if req.action == "validate":
@@ -167,3 +182,20 @@ async def update_inbox_note(filename: str, req: UpdateRequest):
         f.write(new_content)
         
     return {"message": "Nota actualizada correctamente"}
+
+@app.delete("/inbox/{filename}")
+async def delete_note(filename: str):
+    """Elimina una nota físicamente del disco"""
+    # Buscamos primero en el Inbox
+    inbox_path = os.path.join(INBOX_DIR, filename)
+    if os.path.exists(inbox_path):
+        os.remove(inbox_path)
+        return {"message": "Nota eliminada del Inbox"}
+        
+    # Si no está en el Inbox, buscamos en el Cerebro
+    brain_path = os.path.join(BRAIN_DIR, filename)
+    if os.path.exists(brain_path):
+        os.remove(brain_path)
+        return {"message": "Nota eliminada del Cerebro"}
+        
+    raise HTTPException(status_code=404, detail="Archivo no encontrado")
