@@ -184,3 +184,29 @@ header {
   font-size: 15px;
   color: #ccc;
 }
+
+/* ==========================================
+   BADGE DE NOTIFICACIÓN
+   ========================================== */
+.badge {
+  background-color: #cf6679; /* Rojo suave / error */
+  color: #121212;
+  border-radius: 50%;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: bold;
+  margin-left: 8px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Animación de latido para llamar la atención */
+.badge.pulse {
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(207, 102, 121, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(207, 102, 121, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(207, 102, 121, 0); }
+}

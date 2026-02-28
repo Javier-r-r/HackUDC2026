@@ -186,3 +186,27 @@ async function saveToInbox(item) {
   const updatedInbox = [item, ...result.inbox];
   await chrome.storage.local.set({ inbox: updatedInbox });
 }
+
+// background.js de tu extensión
+async function checkPendingNotes() {
+  try {
+    const response = await fetch('http://192.168.1.10:8000/inbox');
+    const items = await response.json();
+    const pendingCount = items.filter(item => item.status === 'pending').length;
+
+    if (pendingCount > 0) {
+      // Pone el numerito en el icono de la extensión
+      chrome.action.setBadgeText({ text: pendingCount.toString() });
+      chrome.action.setBadgeBackgroundColor({ color: '#cf6679' });
+    } else {
+      // Quita el numerito si está limpio
+      chrome.action.setBadgeText({ text: '' });
+    }
+  } catch (error) {
+    console.error("No se pudo conectar con el Cerebro");
+  }
+}
+
+// Que compruebe cada vez que se abre el navegador y luego cada 5 minutos
+checkPendingNotes();
+setInterval(checkPendingNotes, 5 * 60 * 1000);
