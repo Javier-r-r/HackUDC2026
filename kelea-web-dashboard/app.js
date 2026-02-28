@@ -1,5 +1,5 @@
-// CONFIGURACIÓN DE TU API (Cámbialo por la URL real de tu backend)
-const API_BASE_URL = 'https://tu-api-del-hackathon.com/api/inbox';
+// 1. Ponemos la URL real de tu API
+const API_BASE_URL = 'http://192.168.1.10:8000/inbox';
 
 // Estado local
 let currentItems = [];
@@ -21,15 +21,14 @@ const modalTags = document.getElementById('modal-tags');
 const modalContent = document.getElementById('modal-content');
 
 document.addEventListener('DOMContentLoaded', () => {
-  fetchItems();
+  fetchItems(); // Llamamos a la API al cargar la página
 
   // Navegación
-  navInbox.addEventListener('click', () => switchView('pending', '📥 Inbox', navInbox, navProcessed));
-  navProcessed.addEventListener('click', () => switchView('processed', '📚 Done', navProcessed, navInbox));
+  navInbox.addEventListener('click', () => switchView('pending', '📥 Bandeja de Entrada', navInbox, navProcessed));
+  navProcessed.addEventListener('click', () => switchView('processed', '📚 Cerebro Digital', navProcessed, navInbox));
   
   btnRefresh.addEventListener('click', fetchItems);
   
-  // Cerrar/Guardar Modal
   document.getElementById('btn-cancel').addEventListener('click', closeModal);
   document.getElementById('btn-save').addEventListener('click', saveItem);
 });
@@ -43,48 +42,51 @@ function switchView(status, title, activeBtn, inactiveBtn) {
 }
 
 // ==========================================
-// LLAMADAS A LA API
+// LLAMADA REAL A TU API (Fusionado con tu código)
 // ==========================================
-
-// 1. Obtener notas de la API (GET)
 async function fetchItems() {
   loading.classList.remove('hidden');
-  itemsGrid.innerHTML = '';
+  itemsGrid.innerHTML = ''; // Limpiar antes de cargar
   
   try {
-    // Si tu API aún no está lista, comenta el fetch y descomenta los datos de prueba
-    /*
-    const response = await fetch(API_BASE_URL);
-    if (!response.ok) throw new Error('Error en la API');
-    currentItems = await response.json();
-    */
+    const respuesta = await fetch(API_BASE_URL, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 
-    // DATOS DE PRUEBA (Borrar cuando conectes la API real)
-    currentItems = [
-      { id: '1', type: 'link', category: 'Tecnología', tags: ['ia', 'web'], content: 'Resumen mágico de una web de IA.', status: 'pending', timestamp: new Date().toISOString() },
-      { id: '2', type: 'text', category: 'Filosofía', tags: ['estoicismo'], content: 'Nota rápida sobre control de emociones.', status: 'processed', timestamp: new Date().toISOString() }
-    ];
+    if (!respuesta.ok) {
+        throw new Error(`Error en la red: ${respuesta.status}`); // Añadidas las comillas invertidas
+    }
 
+    // Guardamos los datos de TU API en nuestra variable global
+    currentItems = await respuesta.json();
+    console.log("Notas recuperadas del Inbox:", currentItems);
+
+    // Llamamos a la función que pinta las tarjetas bonitas
     renderItems();
+
   } catch (error) {
-    console.error("Error al obtener datos:", error);
-    itemsGrid.innerHTML = '<p style="color:#cf6679;">Error al conectar con la API.</p>';
+    console.error("No se pudo recuperar el inbox:", error);
+    itemsGrid.innerHTML = `<p style="color:#cf6679; text-align:center;">
+      ❌ Error al conectar con la API.<br><br>
+      Asegúrate de que el servidor en 192.168.1.10:8000 está encendido.
+    </p>`;
   } finally {
     loading.classList.add('hidden');
   }
 }
-
 // 2. Actualizar nota en la API (PUT/PATCH)
 async function updateItemInAPI(id, updatedData) {
   try {
-    /*
+    
     const response = await fetch(`${API_BASE_URL}/${id}`, {
       method: 'PATCH', // o PUT dependiendo de tu backend
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedData)
     });
     if (!response.ok) throw new Error('Error al actualizar');
-    */
     
     // Simulación para el frontend por ahora
     console.log("Datos enviados a la API:", id, updatedData);
@@ -116,22 +118,51 @@ function renderItems() {
 
   filteredItems.forEach(item => {
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'inbox-item';
     
-    const tagsHTML = item.tags ? item.tags.map(t => `<span class="tag">#${t}</span>`).join('') : '';
-    const date = new Date(item.timestamp).toLocaleDateString();
+    const tagsHTML = item.tags && item.tags.length > 0 
+    ? item.tags.map(tag => `<span class="tag">#${tag}</span>`).join(' ') 
+    : '';
 
+    // Normalizar fecha: aceptamos `date`, `timestamp` o `created_at` (ISO/string/number)
+    const rawDate = item.date || item.timestamp || item.created_at || item.time;
+    const date = rawDate ? new Date(rawDate).toLocaleDateString() : '';
+
+    const safeType = item.type || 'text';
+    const typeIcon = safeType === 'link' ? '🔗' : safeType === 'text' ? '📝' : '💡';
+
+    const categoryHTML = item.category ? `<span class="category">[${item.title}]</span>` : '';
+
+    // Otros campos que vienen del popup.js
+    const title = item.title || '';
+    const type = item.type || '';
+    
+    const status = item.status || 'pending';
+    const statusBadge = status === 'pending' 
+        ? `<span class="status-badge status-pending">Pendiente</span>` 
+        : `<span class="status-badge status-processed">Procesado</span>`;
+        
     card.innerHTML = `
-      <div class="card-meta">
-        <span class="card-category">[${item.category || 'Sin categoría'}]</span>
-        <span>${date}</span>
-      </div>
-      <div class="card-content">${item.content}</div>
-      <div class="card-tags">${tagsHTML}</div>
-      <div class="card-actions">
-        <button class="btn-secondary btn-sm" onclick="openModal('${item.id}')">✏️ Editar</button>
-        ${item.status === 'pending' ? `<button class="btn-primary btn-sm" onclick="approveItem('${item.id}')">✅ Validar a Cerebro</button>` : ''}
-      </div>
+        <div class="item-meta" style="align-items: center;">
+          <span>${item.title}</span>${typeIcon} ${safeType.toUpperCase()}</span>
+          ${statusBadge}
+        </div>
+        <p class="item-content">${(item.summary || '').substring(0, 300)}${(item.summary || '').length > 300 ? '...' : ''}</p>
+        
+        ${status === 'pending' ? `
+        
+        <div class="edit-form hidden" id="edit-form-${item.id}">
+          <label style="font-size:11px; color:var(--text-muted)">Modificar Categoría:</label>
+          <input type="text" id="edit-cat-${item.id}" value="${item.category || ''}">
+          
+          <label style="font-size:11px; color:var(--text-muted)">Modificar Etiquetas (separadas por coma):</label>
+          <input type="text" id="edit-tags-${item.id}" value="${item.tags ? item.tags.join(', ') : ''}">
+          
+        <div class="card-actions">
+            ${item.status === 'pending' ? `<button class="btn-primary btn-sm" onclick="approveItem('${item.id}')">✅ Validar a Cerebro</button>` : ''}
+        </div>
+        </div>
+        ` : ''}
     `;
     itemsGrid.appendChild(card);
   });
@@ -141,11 +172,16 @@ function renderItems() {
 window.openModal = (id) => {
   const item = currentItems.find(i => i.id === id);
   if (!item) return;
+  // Normalizar tags como string para el input del modal
+  const tagsArray = Array.isArray(item.tags)
+    ? item.tags
+    : (typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
 
   modalId.value = item.id;
   modalCat.value = item.category || '';
-  modalTags.value = item.tags ? item.tags.join(', ') : '';
-  modalContent.value = item.content || '';
+  modalTags.value = tagsArray.join(', ');
+  // Preferir content, pero si no existe usar title (como en popup.js)
+  modalContent.value = item.content || item.title || '';
   
   modal.classList.remove('hidden');
 }
