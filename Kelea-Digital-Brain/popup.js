@@ -111,6 +111,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <label style="font-size:11px; color:var(--text-muted)">Comentario personal:</label>
           <input type="text" id="edit-comment-${item.id}" value="${item.personalComment || ''}" placeholder="Añade un comentario personal...">
 
+          <button class="btn-small btn-improve" data-id="${item.id}" style="border-color: #bb86fc; color: #bb86fc;">✨ Mejorar</button>
+
           <button class="btn-small btn-success btn-save-edit" data-id="${item.id}" style="margin-top:4px;">💾 Guardar y Procesar</button>
         </div>
         ` : ''}
@@ -172,6 +174,47 @@ document.addEventListener('DOMContentLoaded', async () => {
       return null;
     }
   }
+
+  // Función para mejorar la redacción de una nota con IA
+  async function improveTextWithLLM(text) {
+    try {
+      const result = await chrome.storage.local.get(['apiKey']);
+      if (!result.apiKey) {
+        alert("Configura tu API Key en opciones primero.");
+        return text; 
+      }
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${result.apiKey}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          messages: [
+            {
+              role: "system",
+              content: `Eres un editor experto. Tu tarea es coger las notas rápidas del usuario y reescribirlas para que sean claras, profesionales y fáciles de leer. 
+              - Corrige errores ortográficos y gramaticales.
+              - Dale una estructura limpia (usa viñetas si hay listas).
+              - Mantén la idea original intacta.
+              Responde ÚNICAMENTE con el texto mejorado, sin frases introductorias como "Aquí tienes" ni comillas.`
+            },
+            { role: "user", content: text }
+          ],
+          temperature: 0.3
+        })
+      });
+
+      if (!response.ok) return text;
+      const data = await response.json();
+      return data.choices[0].message.content.trim();
+    } catch (e) {
+      console.error("Error mejorando el texto:", e);
+      return text;
+    }
+}
 
   // Exportar a Markdown blindado
   btnExport.addEventListener('click', async () => {
@@ -253,14 +296,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     const id = e.target.getAttribute('data-id');
     if (!id) return;
 
-    // Mostrar/Ocultar formulario de edición
-    if (e.target.classList.contains('btn-edit')) {
-      document.getElementById(`edit-form-${id}`).classList.toggle('hidden');
-    }
+    if (e.target.classList.contains('btn-improve')) {
+      const btn = e.target;
+      btn.innerText = "⏳ Reescribiendo..."; // Feedback visual
+      btn.disabled = true; // Evitamos doble clic
 
-    // Aprobar directamente la sugerencia de la IA
-    if (e.target.classList.contains('btn-approve')) {
-      await updateItemData(id, null, null, 'processed');
+      const result = await chrome.storage.local.get({ inbox: [] });
+      const itemToImprove = result.inbox.find(i => i.id === id);
+
+      if (itemToImprove) {
+        // Llamamos a la IA
+        const improvedText = await improveTextWithLLM(itemToImprove.content);
+        
+        // Actualizamos la nota
+        itemToImprove.content = improvedText;
+        // Le añadimos una etiqueta automáticamente para saber que la IA la tocó
+        if (!itemToImprove.tags.includes('mejorado-ia')) {
+          itemToImprove.tags.push('mejorado-ia');
+        }
+
+        // Guardamos y recargamos
+        await chrome.storage.local.set({ inbox: result.inbox });
+        renderInbox();
+      }
     }
 
     // Guardar edición manual
