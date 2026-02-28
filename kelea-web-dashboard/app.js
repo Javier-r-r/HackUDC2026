@@ -7,9 +7,11 @@ let showingStatus = 'pending'; // 'pending' o 'processed'
 
 // Elementos del DOM
 const itemsGrid = document.getElementById('items-grid');
+const networkGraph = document.getElementById('network-graph'); // NUEVO
 const btnRefresh = document.getElementById('btn-refresh');
 const navInbox = document.getElementById('nav-inbox');
 const navProcessed = document.getElementById('nav-processed');
+const navGraph = document.getElementById('nav-graph'); // NUEVO
 const viewTitle = document.getElementById('view-title');
 const loading = document.getElementById('loading');
 let selectedTags = [];
@@ -53,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Navegación
   navInbox.addEventListener('click', () => switchView('pending', '📥 Bandeja de Entrada', navInbox, navProcessed));
   navProcessed.addEventListener('click', () => switchView('processed', '📚 Cerebro Digital', navProcessed, navInbox));
+  navGraph.addEventListener('click', () => switchView('graph', '🕸️ Grafo de Conocimiento', navGraph, [navInbox, navProcessed]));
   
   btnRefresh.addEventListener('click', fetchItems);
   
@@ -71,10 +74,16 @@ function switchView(status, title, activeBtn, inactiveBtn) {
   
   if (status === 'processed') {
     filterContainer.classList.remove('hidden');
-    renderTagFilters(); // Dibujamos los filtros
+    document.querySelector('.search-container').classList.remove('hidden');
+    renderTagFilters(); 
+  } else if (status === 'graph') {
+    filterContainer.classList.add('hidden');
+    document.querySelector('.search-container').classList.add('hidden'); // Ocultamos buscador en el grafo
   } else {
     filterContainer.classList.add('hidden');
+    document.querySelector('.search-container').classList.remove('hidden');
   }
+
   renderItems();
 }
 
@@ -161,6 +170,16 @@ async function updateItemInAPI(filename, updatedData) {
 // ==========================================
 
 function renderItems() {
+  if (showingStatus === 'graph') {
+    itemsGrid.classList.add('hidden');
+    networkGraph.classList.remove('hidden');
+    renderGraph(); // Llamamos a la nueva función del grafo
+    return; // Paramos aquí
+  } else {
+    itemsGrid.classList.remove('hidden');
+    networkGraph.classList.add('hidden');
+    itemsGrid.innerHTML = '';
+  }
   itemsGrid.innerHTML = '';
   let filteredItems = currentItems.filter(item => item.status === showingStatus);
 
@@ -596,3 +615,84 @@ window.exportItemToMD = (id) => {
     alert("Hubo un error al exportar la nota.");
   }
 };
+
+// ==========================================
+// RENDERIZADO DEL GRAFO (vis-network)
+// ==========================================
+function renderGraph() {
+  const processedItems = currentItems.filter(item => item.status === 'processed');
+  const nodesArray = [];
+  const edgesArray = [];
+  const tagNodesAdded = new Set();
+
+  processedItems.forEach(item => {
+    // 1. Crear el nodo de la nota
+    const shortTitle = (item.title || 'Nota').substring(0, 20) + (item.title?.length > 20 ? '...' : '');
+    nodesArray.push({
+      id: item.id,
+      label: shortTitle,
+      title: item.summary || item.content || 'Sin contenido', // Tooltip
+      shape: 'box',
+      color: { background: '#1e1e1e', border: '#bb86fc' },
+      font: { color: '#e0e0e0' }
+    });
+
+    // 2. Crear los nodos de las etiquetas y unirlos a la nota
+    let tags = [];
+    if (Array.isArray(item.tags)) tags = item.tags;
+    else if (typeof item.tags === 'string') tags = item.tags.split(',').map(t => t.trim()).filter(Boolean);
+
+    tags.forEach(tag => {
+      const tagLimpio = unificarTexto(tag);
+      if (!tagLimpio) return;
+      
+      const tagId = 'tag_' + tagLimpio;
+      
+      // Creamos la etiqueta solo si no existe ya
+      if (!tagNodesAdded.has(tagId)) {
+        nodesArray.push({
+          id: tagId,
+          label: '#' + tagLimpio,
+          shape: 'dot',
+          size: 15,
+          color: { background: '#cf6679', border: '#cf6679' },
+          font: { color: '#e0e0e0', size: 14, bold: true }
+        });
+        tagNodesAdded.add(tagId);
+      }
+
+      // Conectamos la nota con la etiqueta
+      edgesArray.push({
+        from: item.id,
+        to: tagId,
+        color: { color: '#555' }
+      });
+    });
+  });
+
+  const data = {
+    nodes: new vis.DataSet(nodesArray),
+    edges: new vis.DataSet(edgesArray)
+  };
+
+  const options = {
+    physics: {
+      barnesHut: { gravitationalConstant: -3000, centralGravity: 0.3, springLength: 150 }
+    },
+    interaction: { hover: true },
+    nodes: { borderWidth: 2, shadow: true },
+    edges: { smooth: { type: 'continuous' } }
+  };
+
+  const network = new vis.Network(networkGraph, data, options);
+
+  // Abrir modal al hacer doble clic en una nota
+  network.on("doubleClick", function (params) {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0];
+      if (!nodeId.startsWith('tag_')) { // Solo abrimos si no es un tag
+        openModal(nodeId);
+      }
+    }
+  });
+}

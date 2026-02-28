@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kelea Digital Brain - Dashboard</title>
   <link rel="stylesheet" href="style.css">
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -14,6 +15,7 @@
         <button class="nav-btn active" id="nav-inbox">📥 Inbox (Pendientes)</button>
           <span id="inbox-badge" class="badge hidden">0</span>
         <button class="nav-btn" id="nav-processed">📚 Cerebro (Procesados)</button>
+        <button class="nav-btn" id="nav-graph">🕸️ Grafo de Conocimiento</button>
       </nav>
       <div class="user-info">
         <p>Usuario Hackathon</p>
@@ -37,7 +39,7 @@
         <input type="text" id="search-input" placeholder="🔍 Buscar por título..." style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-main); font-size: 14px; transition: border-color 0.2s;">
       </div>
       <div id="filter-container" class="hidden" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);"></div>
-    
+      <div id="network-graph" class="hidden" style="width: 100%; height: 70vh; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;"></div>
       <div id="items-grid" class="items-grid"></div>
     </main>
 
