@@ -272,7 +272,6 @@ function createAndAppendCard(item) {
     ` : ''}
         
     <div class="card-actions" style="margin-top: 15px; display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px;">
-      <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); deleteItem('${item.id}')" style="color: #cf6679; border-color: rgba(207, 102, 121, 0.3); background: transparent;">🗑️ Borrar</button>
       ${status === 'pending' ? `<button class="btn-primary btn-sm" onclick="event.stopPropagation(); approveItem('${item.id}')">✅ Confirmar y Enviar al Cerebro</button>` : ''}
     </div>
   `;
@@ -373,14 +372,13 @@ function renderTagFilters() {
   if (!filterContainer) return;
   const processedItems = currentItems.filter(item => item.status === 'processed');
 
-  // 1. Extraer todas las etiquetas únicas (pasadas por la limpiadora)
+  // Extraer todas las etiquetas únicas limpias
   const allTags = new Set();
   processedItems.forEach(item => {
     let tagsArray = [];
     if (Array.isArray(item.tags)) tagsArray = item.tags;
     else if (typeof item.tags === 'string') tagsArray = item.tags.split(',');
     
-    // Limpiamos cada etiqueta antes de crearle su botón
     tagsArray.forEach(t => {
       const tagLimpio = unificarTexto(t);
       if (tagLimpio) allTags.add(tagLimpio);
@@ -392,17 +390,19 @@ function renderTagFilters() {
     return;
   }
 
-  // 2. Dibujamos los botones
-  let html = `<span style="font-size: 13px; color: var(--text-muted); margin-right: 15px;">🏷️ Filtrar por:</span>`;
+  // Pequeña función de ayuda para crear los botones HTML
+  const createBtn = (tagValue, label, isActive) => {
+    const bg = isActive ? 'var(--primary)' : 'transparent';
+    const color = isActive ? '#121212' : 'var(--primary)';
+    const fw = isActive ? 'bold' : 'normal';
+    const arg = tagValue === null ? 'null' : `'${tagValue}'`;
+    return `<button onclick="filterByTag(${arg})" style="margin-right: 8px; margin-bottom: 8px; padding: 4px 12px; border-radius: 15px; border: 1px solid var(--primary); background: ${bg}; color: ${color}; cursor: pointer; font-size: 12px; font-weight: ${fw}; transition: all 0.2s;">${label}</button>`;
+  };
 
-  const allActive = selectedTag === null;
-  html += `<button onclick="filterByTag(null)" style="margin-right: 8px; margin-bottom: 8px; padding: 4px 12px; border-radius: 15px; border: 1px solid var(--primary); background: ${allActive ? 'var(--primary)' : 'transparent'}; color: ${allActive ? '#121212' : 'var(--primary)'}; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s;">Todas</button>`;
+  let html = `<div style="display: flex; align-items: center; flex-wrap: wrap;">`;
+  html += `<span style="font-size: 13px; color: var(--text-muted); margin-right: 15px; margin-bottom: 8px;">🏷️ Filtrar por:</span>`;
 
-  // Botones para cada etiqueta limpia
-  allTags.forEach(tag => {
-    const isActive = selectedTag === tag;
-    html += `<button onclick="filterByTag('${tag}')" style="margin-right: 8px; margin-bottom: 8px; padding: 4px 12px; border-radius: 15px; border: 1px solid var(--primary); background: ${isActive ? 'var(--primary)' : 'transparent'}; color: ${isActive ? '#121212' : 'var(--primary)'}; cursor: pointer; font-size: 12px; transition: all 0.2s;">#${tag}</button>`;
-  });
+  const isAllActive = selectedTags.length === 0;
 
   if (!tagsExpanded) {
     // VISTA CONTRAÍDA
@@ -430,78 +430,25 @@ function renderTagFilters() {
 }
 
 window.filterByTag = (tag) => {
-  selectedTag = tag; // Actualizamos la etiqueta elegida
-  renderTagFilters(); // Redibujamos los botones para cambiar los colores (cuál está activo)
-  renderItems(); // Redibujamos las tarjetas filtradas
+  if (tag === null) {
+    // Si hace clic en "Todas", vaciamos la lista y contraemos el menú
+    selectedTags = [];
+    tagsExpanded = false;
+  } else {
+    // Si hace clic en una etiqueta, la ponemos o la quitamos
+    if (selectedTags.includes(tag)) {
+      selectedTags = selectedTags.filter(t => t !== tag); // La quitamos
+    } else {
+      selectedTags.push(tag); // La añadimos
+    }
+    // Nota: ¡NO ponemos tagsExpanded = false aquí para que puedas elegir varias!
+  }
+  
+  renderTagFilters(); 
+  renderItems(); 
 };
 
-// ==========================================
-// SISTEMA DE ELIMINACIÓN Y DUPLICADOS
-// ==========================================
-
-// Función base para borrar una nota llamando a la API
-window.deleteItem = async (id, skipConfirm = false) => {
-  if (!skipConfirm && !confirm("¿Seguro que quieres eliminar esta nota de forma permanente?")) return;
-  
-  try {
-    const safeFilename = encodeURIComponent(id);
-    const response = await fetch(`${API_BASE_URL}/${safeFilename}`, {
-      method: 'DELETE'
-    });
-    
-    if (!response.ok) throw new Error("Error al borrar en el servidor");
-    
-    // Solo recargamos si es un borrado manual único
-    if (!skipConfirm) {
-      console.log(`🗑️ Nota ${id} eliminada`);
-      await fetchItems();
-    }
-  } catch (error) {
-    console.error("❌ Error al eliminar:", error);
-  }
-}
-
-// Función MÁGICA para detectar y limpiar duplicados
-window.cleanDuplicates = async () => {
-  // Vamos a usar el 'título' como identificador de duplicados. 
-  // (Si capturas la misma web 2 veces, tendrá el mismo título).
-  const seenTitles = new Set();
-  const duplicateIds = [];
-
-  currentItems.forEach(item => {
-    // Normalizamos el título para evitar fallos por mayúsculas o espacios
-    const titleKey = item.title ? unificarTexto(item.title) : null;
-    
-    if (!titleKey) return; // Si no tiene título, lo ignoramos
-
-    if (seenTitles.has(titleKey)) {
-      // Si ya hemos visto este título, es un duplicado
-      duplicateIds.push(item.id);
-    } else {
-      // Si es la primera vez que lo vemos, lo registramos
-      seenTitles.add(titleKey);
-    }
-  });
-
-  // Avisamos al usuario
-  if (duplicateIds.length === 0) {
-    alert("✨ ¡Tu cerebro está limpio! No se han encontrado notas duplicadas.");
-    return;
-  }
-
-  const confirmacion = confirm(`🧹 Se han encontrado ${duplicateIds.length} notas duplicadas.\n\nEl sistema mantendrá la versión más antigua y borrará las copias. ¿Deseas proceder?`);
-  
-  if (confirmacion) {
-    // Ponemos el mensaje de "Cargando" para que el usuario espere
-    document.getElementById('loading').classList.remove('hidden');
-    
-    // Borramos los duplicados uno por uno (silenciosamente)
-    for (const id of duplicateIds) {
-      await deleteItem(id, true); // true = skipConfirm
-    }
-    
-    // Recargamos la interfaz
-    await fetchItems();
-    alert("✅ Limpieza de duplicados completada con éxito.");
-  }
-}
+window.toggleTags = () => {
+  tagsExpanded = !tagsExpanded; // Cambia entre verdadero y falso
+  renderTagFilters(); // Redibuja los botones
+};
