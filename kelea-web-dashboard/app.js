@@ -15,6 +15,7 @@ const loading = document.getElementById('loading');
 let selectedTags = [];
 let tagsExpanded = false;
 const filterContainer = document.getElementById('filter-container')
+const inboxBadge = document.getElementById('inbox-badge');
 
 // Modal
 const modal = document.getElementById('edit-modal');
@@ -96,7 +97,9 @@ async function fetchItems() {
     }));
 
     console.log("Notas recuperadas (con ID normalizado):", currentItems);
-
+    
+    updateNotificationBadge();
+    
     // Llamamos a la función que pinta las tarjetas
     renderItems();
     
@@ -522,5 +525,23 @@ window.cleanDuplicates = async () => {
     // Recargamos la interfaz
     await fetchItems();
     alert("✅ Limpieza de duplicados completada con éxito.");
+  }
+}
+
+// Actualiza el contador de notificaciones de la Bandeja de Entrada
+window.updateNotificationBadge = () => {
+  if (!inboxBadge) return;
+  
+  // Contamos cuántas notas están pendientes
+  const pendingCount = currentItems.filter(item => item.status === 'pending').length;
+  
+  if (pendingCount > 0) {
+    inboxBadge.textContent = pendingCount;
+    inboxBadge.classList.remove('hidden');
+    inboxBadge.classList.add('pulse');
+  } else {
+    // Si no hay nada, ocultamos la burbuja
+    inboxBadge.classList.add('hidden');
+    inboxBadge.classList.remove('pulse');
   }
 }
