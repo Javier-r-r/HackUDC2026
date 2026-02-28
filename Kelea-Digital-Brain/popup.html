@@ -9,11 +9,6 @@
     <h1>🧠 Kelea Brain</h1>
   </div>
 
-  <div class="tabs">
-    <button id="tab-capture" class="active">Capturar</button>
-    <button id="tab-inbox">Inbox</button>
-  </div>
-
   <div id="view-capture" class="view active">
     <input type="text" id="quick-comment" placeholder="Añade contexto...(Opcional)" style="width: 100%; margin-bottom: 12px; background-color: var(--surface); color: var(--text-main); border: 1px solid var(--border); padding: 8px; border-radius: 6px; font-size: 12px;">
 
@@ -27,10 +22,8 @@
     <p id="status-msg" class="hidden" style="margin-top: 12px; font-weight: bold; text-align: center;"></p>
   </div>
 
-  <div id="view-inbox" class="view hidden">
-    <div id="inbox-list"></div>
-    <button id="btn-export" class="btn-secondary">⬇️ Exportar a Markdown</button>
-    <button id="btn-clear" class="btn-danger">🗑️ Vaciar Inbox</button>
+    <button id="btn-save" class="btn-primary" style="margin-top:15px;">🚀 Guardar en mi Cerebro</button>
+    <p id="status-msg" class="hidden">¡Enviado con éxito!</p>
   </div>
 
   <script src="popup.js"></script>

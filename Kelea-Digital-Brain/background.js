@@ -29,12 +29,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     newItem.summary = info.selectionText;
     
     chrome.action.setBadgeText({ text: "..." });
-    chrome.action.setBadgeBackgroundColor({ color: "#bb86fc" });
 
     const aiData = await analyzeWithLLM(newItem.summary);
     if (aiData) {
-      newItem.category = aiData.category;
-      newItem.tags = aiData.tags;
+        newItem.category = aiData.category;
+        newItem.tags = aiData.tags;
+        newItem.summary = aiData.summary; // 👈 Ahora sí asignamos el resumen de la IA
+        // Eliminado el error de pageText
     }
     chrome.action.setBadgeText({ text: "" });
 
@@ -101,6 +102,7 @@ async function analyzeWithLLM(text) {
             Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos:
             1. "category": Una sola palabra que defina el área.
             2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas.
+            3. "summary": Un resumen muy conciso (máximo 3 líneas) explicando de qué trata la página y por qué es útil.
             Responde SOLO con el JSON validado, sin texto adicional.`
           },
           { role: "user", content: text }
@@ -154,6 +156,50 @@ async function summarizePageWithLLM(text) {
     let resultText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(resultText); 
   } catch (error) {
+    return null; 
+  }
+}
+
+// Nueva función para resumir páginas web
+async function summarizePageWithLLM(text) {
+  try {
+    const result = await chrome.storage.local.get(['apiKey']);
+    const apiKey = result.apiKey;
+
+    if (!apiKey) return null;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente experto en PKM. Analiza el siguiente texto extraído de una página web y devuelve un JSON estricto con 3 campos:
+            1. "category": Una palabra clave (ej. Tecnología, Tutorial, Noticia).
+            2. "tags": Array de 1 a 3 etiquetas clave.
+            3. "summary": Un resumen muy conciso (máximo 3 líneas) explicando de qué trata la página y por qué es útil.
+            Responde SOLO con el JSON validado, sin texto adicional.`
+          },
+          { role: "user", content: text }
+        ],
+        temperature: 0.2
+      })
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    let resultText = data.choices[0].message.content;
+    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    return JSON.parse(resultText); 
+  } catch (error) {
+    console.error("❌ Error en el resumen:", error);
     return null; 
   }
 }
