@@ -185,6 +185,18 @@ header {
   color: #ccc;
 }
 
+/* Inputs más estrechos para categoría/etiquetas en las tarjetas y modal */
+.edit-form input,
+input[id^="edit-cat-"],
+input[id^="edit-tags-"],
+.inline-triage input,
+.modal-content input#modal-category,
+.modal-content input#modal-tags {
+  width: 260px !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* ==========================================
    BADGE DE NOTIFICACIÓN
    ========================================== */
