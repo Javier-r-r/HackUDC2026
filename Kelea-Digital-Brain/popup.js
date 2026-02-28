@@ -1,7 +1,9 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  const tabCapture = document.getElementById('tab-capture');
+  const tabInbox = document.getElementById('tab-inbox');
+  const viewCapture = document.getElementById('view-capture');
+  const viewInbox = document.getElementById('view-inbox');
   const btnSave = document.getElementById('btn-save');
-  const fileInput = document.getElementById('file-input');
-  const fileNameDisplay = document.getElementById('file-name-display');
   const quickNote = document.getElementById('quick-note');
   const statusMsg = document.getElementById('status-msg');
   const inboxList = document.getElementById('inbox-list');
@@ -18,22 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderInbox();
   });
 
-  let selectedFileBase64 = null;
-  let selectedFileName = "";
-
-  // Mostrar nombre del archivo al seleccionar
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      selectedFileName = file.name;
-      fileNameDisplay.textContent = `Archivo: ${file.name}`;
-      fileNameDisplay.classList.remove('hidden');
-
-      const reader = new FileReader();
-      reader.onload = () => { selectedFileBase64 = reader.result.split(',')[1]; };
-      reader.readAsDataURL(file);
-    }
-  });
+  function switchTab(activeTab, activeView, inactiveTab, inactiveView) {
+    activeTab.classList.add('active');
+    activeView.classList.add('active');
+    inactiveTab.classList.remove('active');
+    inactiveView.classList.remove('active');
+  }
 
   async function saveToAPI(newItem) {
     await fetch(API_BASE_URL, {
