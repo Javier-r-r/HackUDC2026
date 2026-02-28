@@ -51,18 +51,89 @@ header {
 
 /* Grid de Notas */
 .items-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 24px;
 }
 
-.card {
-  background-color: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; position: relative; display: flex; flex-direction: column;
+.inbox-item {
+  background-color: var(--surface);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  border-left: 3px solid var(--primary);
 }
 
-.card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
-.card-category { color: var(--primary); font-weight: bold; }
-.card-content { font-size: 14px; margin-bottom: 15px; flex: 1; line-height: 1.5; }
-.card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 15px; }
-.tag { background-color: #2c2c2c; padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+.item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.item-content {
+  margin: 0;
+  word-break: break-word;
+}
+
+.category {
+  color: var(--primary);
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.item-tags {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  background-color: #2c2c2c;
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* Estados y validación (NUEVO) */
+.status-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.status-pending { 
+  background-color: #cf6679; /* Rojo suave */
+  color: #121212; 
+}
+.status-processed { 
+  background-color: #4caf50; /* Verde */
+  color: #121212; 
+}
+
+.edit-form {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #1a1a1a;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+}
+
+.edit-form input {
+  background-color: var(--bg-color);
+  border: 1px solid var(--border);
+  color: white;
+  padding: 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
 
 /* Botones */
 .btn-primary, .btn-secondary {
@@ -85,3 +156,31 @@ header {
   width: 100%; background: var(--bg-dark); color: white; border: 1px solid var(--border); padding: 10px; border-radius: 6px; box-sizing: border-box; font-family: inherit;
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+
+/* Utilidad para ocultar elementos */
+.hidden {
+  display: none !important;
+}
+
+/* Estilos para el Modal de Lectura */
+.view-modal-content {
+  width: 600px; /* Más ancho para leer bien */
+  max-width: 90%;
+  max-height: 85vh; /* Si el texto es larguísimo, no se sale de la pantalla */
+  overflow-y: auto; /* Añade scroll interno si hace falta */
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.full-content {
+  white-space: pre-wrap; /* Mágico: respeta los saltos de línea reales de tu texto */
+  line-height: 1.6;
+  font-size: 15px;
+  color: #ccc;
+}

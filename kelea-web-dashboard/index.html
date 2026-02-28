@@ -21,18 +21,21 @@
 
     <main class="content">
       <header>
-        <h1 id="view-title">Bandeja de Entrada</h1>
+        <h1 id="view-title">📥 Bandeja de Entrada</h1>
         <button id="btn-refresh" class="btn-primary">🔄 Actualizar</button>
       </header>
 
       <div id="loading" class="hidden">Cargando tu conocimiento... ⏳</div>
-      
+    <!-- Separador entre el loading y el grid -->
+      <div style="height:0.5rem;" aria-hidden="true"></div>
+      <div id="filter-container" class="hidden" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);"></div>
+    
       <div id="items-grid" class="items-grid"></div>
     </main>
 
     <div id="edit-modal" class="modal hidden">
       <div class="modal-content">
-        <h3>✏️ Editar Nota</h3>
+        <h3 id="modal-header-title">✏️ Editar Nota</h3>
         <input type="hidden" id="modal-id">
         
         <label>Categoría</label>
@@ -46,7 +49,24 @@
         
         <div class="modal-actions">
           <button id="btn-cancel" class="btn-secondary">Cancelar</button>
-          <button id="btn-save" class="btn-primary">💾 Guardar y Procesar</button>
+          <button id="btn-save" class="btn-primary">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+    <div id="view-modal" class="modal hidden">
+      <div class="modal-content view-modal-content">
+        <div class="modal-header">
+          <span id="view-category" class="card-category"></span>
+          <span id="view-date" style="color:var(--text-muted); font-size:12px;"></span>
+        </div>
+        
+        <h2 id="view-title" style="margin-top: 15px; margin-bottom: 10px; color: var(--text-main);"></h2>
+        <div id="view-tags" class="card-tags" style="margin-bottom: 15px;"></div>
+        
+        <div id="view-content" class="full-content"></div>
+        
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button class="btn-secondary" onclick="closeViewModal()">Cerrar</button>
         </div>
       </div>
     </div>
