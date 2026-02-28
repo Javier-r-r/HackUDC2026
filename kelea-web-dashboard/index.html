@@ -35,8 +35,9 @@
       <div id="loading" class="hidden">Cargando tu conocimiento... ⏳</div>
     <!-- Separador entre el loading y el grid -->
       <div style="height:0.5rem;" aria-hidden="true"></div>
-      <div class="search-container" style="margin-bottom: 20px;">
-        <input type="text" id="search-input" placeholder="🔍 Buscar por título..." style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-main); font-size: 14px; transition: border-color 0.2s;">
+      <div class="search-container" style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <input type="text" id="search-input" placeholder="🔍 Buscar exacto por título..." style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-main); font-size: 14px; transition: border-color 0.2s;"> 
+        <button id="btn-semantic-search" class="btn-primary" style="background-color: #bb86fc; color: #000; font-weight: bold; border-radius: 8px; padding: 0 20px; border: none; cursor: pointer;">✨ Ranking IA</button>
       </div>
       <div id="filter-container" class="hidden" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);"></div>
       <div id="network-graph" class="hidden" style="width: 100%; height: 70vh; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;"></div>

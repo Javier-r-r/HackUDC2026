@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://192.168.1.10:8000/inbox'; // Apuntando a inbox
+const API_BASE_URL = 'http://localhost:8000/inbox'; // Apuntando a inbox
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
