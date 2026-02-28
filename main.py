@@ -50,6 +50,7 @@ def get_ai_metadata(content: str):
             Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos:
             1. "category": Una sola palabra que defina el área (ej. Programación, Marketing, Filosofía, Herramienta).
             2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas.
+            3. "summary": resumen de máximo 10 palabras
             Responde SOLO con el JSON validado.`
     {truncated_content}
     """
@@ -117,15 +118,43 @@ async def list_inbox():
                     files.append(meta)
     return files
 
-@app.post("/process")
-async def process_note(req: ProcessRequest):
-    """Mover del Inbox al Cerebro permanente tras validación humana [cite: 157, 158]"""
-    source_path = os.path.join(INBOX_DIR, req.filename)
-    dest_path = os.path.join(BRAIN_DIR, req.filename)
+# Nuevo modelo de datos para actualizar
+class UpdateRequest(BaseModel):
+    category: str
+    tags: List[str]
+    action: Optional[str] = None # Si enviamos "validate", la moveremos
+
+# El nuevo endpoint RESTful
+@app.put("/inbox/{filename}")
+async def update_inbox_note(filename: str, req: UpdateRequest):
+    """Actualizar una nota específica (sin moverla físicamente)"""
+    # Todo vive en la misma carpeta ahora
+    filepath = os.path.join(INBOX_DIR, filename) 
     
-    if not os.path.exists(source_path):
+    if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
         
-    # Aquí podrías actualizar los tags/categoría en el archivo antes de moverlo
-    os.rename(source_path, dest_path)
-    return {"message": f"Nota movida a {req.category}"}
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+        
+    parts = content.split("---")
+    if len(parts) >= 3:
+        meta = yaml.safe_load(parts[1])
+        
+        # Actualizamos los datos
+        meta["category"] = req.category
+        meta["tags"] = req.tags
+        
+        # MAGIA AQUÍ: Si la acción es validate, cambiamos el estado, pero NO movemos el archivo
+        if req.action == "validate":
+            meta["status"] = "processed"
+            
+        new_content = f"---\n{yaml.dump(meta)}---\n{parts[2]}"
+    else:
+        raise HTTPException(status_code=500, detail="Formato markdown inválido")
+
+    # Sobrescribimos el archivo en el mismo sitio
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(new_content)
+        
+    return {"message": "Nota actualizada correctamente"}
