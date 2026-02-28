@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <span>${typeIcon} ${safeType.toUpperCase()} ${categoryHTML}</span>
           ${statusBadge}
         </div>
-        <p class="item-content">${(item.content || '').substring(0, 80)}${(item.content || '').length > 80 ? '...' : ''}</p>
+        <p class="item-content">${(item.content || '').substring(0, 150)}${(item.content || '').length > 150 ? '...' : ''}</p>
         <div class="item-tags">${tagsHTML}</div>
         
         ${status === 'pending' ? `

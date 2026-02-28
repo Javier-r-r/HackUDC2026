@@ -41,8 +41,44 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   } else if (info.menuItemId === "capture-page") {
     newItem.type = "link";
-    newItem.content = "Enlace guardado";
-    newItem.category = "Recurso";
+    newItem.content = "Procesando página... ⏳"; // Mensaje temporal
+
+    chrome.action.setBadgeText({ text: "IA" });
+    chrome.action.setBadgeBackgroundColor({ color: "#bb86fc" });
+
+    try {
+      // 1. Inyectar script para extraer el texto de la web actual
+      const injectionResults = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          // Intenta buscar el contenido principal, si no, coge todo el body
+          const mainContent = document.querySelector('article, main') || document.body;
+          return mainContent.innerText;
+        }
+      });
+
+      const pageText = injectionResults[0].result;
+      
+      // 2. Cortamos el texto (primeros 5000 caracteres) para que la IA no se sature ni tarde mucho
+      const truncatedText = pageText.substring(0, 5000);
+
+      // 3. Mandamos el texto a la IA para que lo resuma
+      const aiData = await summarizePageWithLLM(truncatedText);
+
+      if (aiData) {
+        newItem.category = aiData.category;
+        newItem.tags = aiData.tags;
+        newItem.content = aiData.summary; // Guardamos el resumen de 3 líneas
+      } else {
+        newItem.content = "Enlace guardado (Sin resumen de IA)";
+      }
+
+    } catch (e) {
+      console.error("Error extrayendo texto de la página:", e);
+      newItem.content = "Enlace guardado (No se pudo extraer el texto)";
+    }
+
+    chrome.action.setBadgeText({ text: "" });
   }
 
   await saveToInbox(newItem);
@@ -97,6 +133,50 @@ async function analyzeWithLLM(text) {
     
   } catch (error) {
     console.error("❌ Error grave en la función de IA:", error);
+    return null; 
+  }
+}
+
+// Nueva función para resumir páginas web
+async function summarizePageWithLLM(text) {
+  try {
+    const result = await chrome.storage.local.get(['apiKey']);
+    const apiKey = result.apiKey;
+
+    if (!apiKey) return null;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente experto en PKM. Analiza el siguiente texto extraído de una página web y devuelve un JSON estricto con 3 campos:
+            1. "category": Una palabra clave (ej. Tecnología, Tutorial, Noticia).
+            2. "tags": Array de 1 a 3 etiquetas clave.
+            3. "summary": Un resumen muy conciso (máximo 3 líneas) explicando de qué trata la página y por qué es útil.
+            Responde SOLO con el JSON validado, sin texto adicional.`
+          },
+          { role: "user", content: text }
+        ],
+        temperature: 0.2
+      })
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    let resultText = data.choices[0].message.content;
+    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    return JSON.parse(resultText); 
+  } catch (error) {
+    console.error("❌ Error en el resumen:", error);
     return null; 
   }
 }
