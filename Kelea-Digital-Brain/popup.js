@@ -1,53 +1,70 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  const tabCapture = document.getElementById('tab-capture');
-  const tabInbox = document.getElementById('tab-inbox');
-  const viewCapture = document.getElementById('view-capture');
-  const viewInbox = document.getElementById('view-inbox');
+document.addEventListener('DOMContentLoaded', () => {
   const btnSave = document.getElementById('btn-save');
+  const fileInput = document.getElementById('file-input');
+  const fileNameDisplay = document.getElementById('file-name-display');
   const quickNote = document.getElementById('quick-note');
   const statusMsg = document.getElementById('status-msg');
-  const inboxList = document.getElementById('inbox-list');
-  const btnExport = document.getElementById('btn-export');
-  const btnClear = document.getElementById('btn-clear');
 
-  // Navegación
-  tabCapture.addEventListener('click', () => switchTab(tabCapture, viewCapture, tabInbox, viewInbox));
-  tabInbox.addEventListener('click', () => {
-    switchTab(tabInbox, viewInbox, tabCapture, viewCapture);
-    renderInbox();
+  let selectedFileBase64 = null;
+  let selectedFileName = "";
+
+  // Mostrar nombre del archivo al seleccionar
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      selectedFileName = file.name;
+      fileNameDisplay.textContent = `Archivo: ${file.name}`;
+      fileNameDisplay.classList.remove('hidden');
+
+      const reader = new FileReader();
+      reader.onload = () => { selectedFileBase64 = reader.result.split(',')[1]; };
+      reader.readAsDataURL(file);
+    }
   });
 
-  function switchTab(activeTab, activeView, inactiveTab, inactiveView) {
-    activeTab.classList.add('active');
-    activeView.classList.add('active');
-    inactiveTab.classList.remove('active');
-    inactiveView.classList.remove('active');
-  }
-
-  // Guardar nota rápida
   btnSave.addEventListener('click', async () => {
     const text = quickNote.value.trim();
-    if (!text) return;
-
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    const newItem = {
-      id: Date.now().toString(),
-      type: 'idea',
-      content: text,
-      url: tab?.url || '',
-      title: tab?.title || 'Idea rápida',
-      category: 'Idea',
-      timestamp: new Date().toISOString()
+    const payload = {
+      title: selectedFileName || tab.title || "Nueva entrada",
+      content: text || (selectedFileName ? `Archivo adjunto: ${selectedFileName}` : ""),
+      source: tab.url,
+      entry_type: selectedFileBase64 ? "file" : "idea",
+      file_data: selectedFileBase64, // Campo nuevo para el archivo
+      file_name: selectedFileName
     };
 
-    const result = await chrome.storage.local.get({ inbox: [] });
-    await chrome.storage.local.set({ inbox: [newItem, ...result.inbox] });
+    try {
+      const response = await fetch('http://localhost:8000/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    quickNote.value = '';
-    statusMsg.classList.remove('hidden');
-    setTimeout(() => statusMsg.classList.add('hidden'), 2000);
+      if (response.ok) {
+        showStatus("¡Guardado correctamente!");
+        resetForm();
+      }
+    } catch (err) {
+      console.error("Error enviando al server:", err);
+    }
   });
+
+  function resetForm() {
+    quickNote.value = '';
+    fileInput.value = '';
+    selectedFileBase64 = null;
+    selectedFileName = "";
+    fileNameDisplay.classList.add('hidden');
+  }
+
+  function showStatus(msg) {
+    statusMsg.textContent = msg;
+    statusMsg.classList.remove('hidden');
+    setTimeout(() => statusMsg.classList.add('hidden'), 3000);
+  }
+});
 
   // Renderizar Inbox a prueba de fallos
   async function renderInbox() {
@@ -159,5 +176,3 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => btnClear.innerHTML = oldText, 2000);
     }
   });
-
-});

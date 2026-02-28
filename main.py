@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
+import base64
 
 # --- CONFIGURACIÓN ---
 app = FastAPI(title="Kelea Digital Brain API")
@@ -30,9 +31,11 @@ for folder in [INBOX_DIR, BRAIN_DIR]:
 # --- MODELOS DE DATOS ---
 class CaptureRequest(BaseModel):
     content: str
-    source: str  # URL o nombre de la app
-    entry_type: str # text, link, idea
-    title: Optional[str] = "Sin título"
+    source: str
+    entry_type: str
+    title: str
+    file_data: Optional[str] = None # Base64 del archivo
+    file_name: Optional[str] = None
 
 class ProcessRequest(BaseModel):
     filename: str
@@ -75,6 +78,12 @@ def get_ai_metadata(content: str):
 
 @app.post("/capture")
 async def capture_entry(data: CaptureRequest):
+    # Si viene un archivo, lo guardamos físicamente
+    if data.file_data and data.file_name:
+        file_path = os.path.join(INBOX_DIR, data.file_name)
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(data.file_data))
+        data.content += f"\n\n[Archivo guardado localmente: {data.file_name}]"
     """Punto único de captura sin fricción [cite: 117]"""
     # 1. Procesamiento IA en segundo plano [cite: 162]
     ai_suggestions = get_ai_metadata(data.content)    
