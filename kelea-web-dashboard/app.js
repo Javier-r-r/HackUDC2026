@@ -12,7 +12,8 @@ const navInbox = document.getElementById('nav-inbox');
 const navProcessed = document.getElementById('nav-processed');
 const viewTitle = document.getElementById('view-title');
 const loading = document.getElementById('loading');
-let selectedTag = null;
+let selectedTags = [];
+let tagsExpanded = false;
 const filterContainer = document.getElementById('filter-container')
 
 // Modal
@@ -54,7 +55,8 @@ function switchView(status, title, activeBtn, inactiveBtn) {
   activeBtn.classList.add('active');
   inactiveBtn.classList.remove('active');
   // Reseteamos el filtro al cambiar de pestaña
-  selectedTag = null; 
+  tagsExpanded = false;
+  selectedTags = []; 
   
   if (status === 'processed') {
     filterContainer.classList.remove('hidden');
@@ -149,17 +151,20 @@ function renderItems() {
   let filteredItems = currentItems.filter(item => item.status === showingStatus);
 
   // Lógica de filtrado por etiqueta (solo para el Cerebro)
-  if (showingStatus === 'processed' && selectedTag !== null) {
+  if (showingStatus === 'processed' && selectedTags.length > 0) {
     filteredItems = filteredItems.filter(item => {
       let tagsArray = [];
       if (Array.isArray(item.tags)) tagsArray = item.tags;
       else if (typeof item.tags === 'string') tagsArray = item.tags.split(',');
       
-      // Comparamos el texto unificado de la etiqueta de la nota con el tag seleccionado
-      return tagsArray.some(t => unificarTexto(t) === selectedTag);
+      // Limpiamos las etiquetas de la nota actual para compararlas bien
+      const cleanTagsOfItem = tagsArray.map(t => unificarTexto(t));
+      
+      // MÁGIA: .every() asegura que la nota tiene TODAS las etiquetas que has marcado
+      return selectedTags.every(selected => cleanTagsOfItem.includes(selected));
     });
   }
-
+  
   if (filteredItems.length === 0) {
     itemsGrid.innerHTML = '<p style="color:var(--text-muted)">No hay elementos en esta vista.</p>';
     return;
@@ -399,6 +404,28 @@ function renderTagFilters() {
     html += `<button onclick="filterByTag('${tag}')" style="margin-right: 8px; margin-bottom: 8px; padding: 4px 12px; border-radius: 15px; border: 1px solid var(--primary); background: ${isActive ? 'var(--primary)' : 'transparent'}; color: ${isActive ? '#121212' : 'var(--primary)'}; cursor: pointer; font-size: 12px; transition: all 0.2s;">#${tag}</button>`;
   });
 
+  if (!tagsExpanded) {
+    // VISTA CONTRAÍDA
+    html += createBtn(null, 'Todas', isAllActive);
+    
+    // Mostramos TODAS las etiquetas que el usuario tenga seleccionadas actualmente
+    if (!isAllActive) {
+      selectedTags.forEach(tag => {
+        html += createBtn(tag, `#${tag}`, true);
+      });
+    }
+    html += `<button onclick="toggleTags()" style="margin-bottom: 8px; padding: 4px 10px; border-radius: 15px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-main); cursor: pointer; font-size: 10px; transition: all 0.2s;" title="Ver todas las etiquetas">▶ Mostrar más</button>`;
+  } else {
+    // VISTA EXPANDIDA
+    html += createBtn(null, 'Todas', isAllActive);
+    allTags.forEach(tag => {
+      // El botón está activo si su tag está en el array de seleccionados
+      html += createBtn(tag, `#${tag}`, selectedTags.includes(tag));
+    });
+    html += `<button onclick="toggleTags()" style="margin-bottom: 8px; padding: 4px 10px; border-radius: 15px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-main); cursor: pointer; font-size: 10px; transition: all 0.2s;" title="Ocultar etiquetas">◀ Ocultar</button>`;
+  }
+  
+  html += `</div>`;
   filterContainer.innerHTML = html;
 }
 
