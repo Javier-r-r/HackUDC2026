@@ -340,6 +340,7 @@ function createAndAppendCard(item) {
     <div class="card-actions" style="margin-top: 15px; display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px;">
       ${status === 'processed' ? `<button class="btn-secondary btn-sm" onclick="event.stopPropagation(); exportItemToMD('${item.id}')" style="color: #bb86fc; border-color: rgba(187, 134, 252, 0.3); background: transparent;">⬇️ Exportar MD</button>` : ''}
       ${status === 'pending' ? `<button class="btn-primary btn-sm" onclick="event.stopPropagation(); approveItem('${item.id}')">✅ Confirmar y Enviar al Cerebro</button>` : ''}
+      ${status === 'processed' ? `<button class="btn-secondary btn-sm" onclick="event.stopPropagation(); getRecommendations('${item.id}')" style="color: #03dac6; border-color: rgba(3, 218, 198, 0.3); background: transparent;">🌍 Conocer más</button>` : ''}
       <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); deleteItem('${item.id}')" style="color: #cf6679; border-color: rgba(207, 102, 121, 0.3); background: transparent;">🗑️ Borrar</button>
     </div>
   `;
@@ -760,3 +761,100 @@ async function realizarBusquedaSemantica(texto) {
         loading.classList.add('hidden');
     }
 }
+
+// ==========================================
+// FUNCIÓN PARA "CONOCER MÁS" (RECOMENDACIONES IA DESDE JS)
+// ==========================================
+window.closeRecommendations = () => {
+  document.getElementById('recommendations-modal').classList.add('hidden');
+};
+
+window.getRecommendations = async (id) => {
+  const modal = document.getElementById('recommendations-modal');
+  const body = document.getElementById('recommendations-body');
+  
+  // 1. Buscamos la información de la nota seleccionada
+  const item = currentItems.find(i => i.id === id);
+  if (!item) return;
+
+  // 2. Mostramos el modal con animación de carga
+  body.innerHTML = `
+    <div style="text-align:center; padding: 20px;">
+      <p style="color:var(--primary); font-weight: bold; font-size: 16px;">🤖 Analizando tu nota...</p>
+      <p style="color:var(--text-muted); font-size: 13px;">Buscando enlaces de interés relacionados con este tema.</p>
+    </div>
+  `;
+  modal.classList.remove('hidden');
+
+  try {
+    // 3. Obtener la API Key desde el almacenamiento seguro de la web
+    let apiKey = localStorage.getItem('groqApiKey_web');
+    
+    // Si no la tiene guardada, se la pedimos al usuario
+    if (!apiKey) {
+      apiKey = prompt("🔒 Por seguridad de Chrome, introduce tu API Key de Groq para habilitar la IA en esta vista:");
+      if (apiKey && apiKey.trim() !== "") {
+        localStorage.setItem('groqApiKey_web', apiKey.trim());
+      } else {
+        body.innerHTML = '<p style="color:#cf6679; text-align:center;">❌ Operación cancelada. Se necesita la clave para consultar a la IA.</p>';
+        return;
+      }
+    }
+
+    // 4. Preparamos el texto a enviar a la IA
+    const textoNota = `Título: ${item.title || ''}. Contenido: ${item.summary || item.content || ''}`;
+
+    // 5. Llamada directa a Groq API
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente de investigación. Basándote en el tema de la nota proporcionada, devuelve exactamente 3 enlaces útiles y reales (URLs) para seguir aprendiendo. 
+            Responde ÚNICAMENTE con un JSON estricto con este formato:
+            [
+              {"title": "Título del recurso", "url": "https://...", "description": "Por qué es útil (1 línea)"}
+            ]`
+          },
+          { role: "user", content: textoNota.substring(0, 1500) } // Limitamos a 1500 caracteres
+        ],
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      // Si la clave es incorrecta, la borramos para que la vuelva a pedir
+      if (response.status === 401) localStorage.removeItem('groqApiKey_web');
+      throw new Error("Error obteniendo datos de la IA o API Key inválida");
+    }
+    
+    // 6. Extraer el JSON
+    const data = await response.json();
+    let resultText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+    const links = JSON.parse(resultText);
+
+    // 7. Pintar los resultados en el modal
+    let html = '<ul style="list-style: none; padding: 0; margin: 0;">';
+    links.forEach(link => {
+      html += `
+        <li style="margin-bottom: 12px; padding: 12px; background: rgba(3, 218, 198, 0.05); border: 1px solid rgba(3, 218, 198, 0.2); border-radius: 8px; transition: transform 0.2s;">
+          <a href="${link.url}" target="_blank" style="color: #03dac6; font-weight: bold; text-decoration: none; font-size: 14px; display: block; margin-bottom: 4px;">🔗 ${link.title}</a>
+          <p style="margin: 0; font-size: 12px; color: var(--text-main); line-height: 1.4;">${link.description}</p>
+        </li>
+      `;
+    });
+    html += '</ul>';
+    
+    body.innerHTML = html;
+
+  } catch (error) {
+    console.error("Error en recomendaciones:", error);
+    body.innerHTML = '<p style="color:#cf6679; text-align:center;">❌ La IA no pudo procesar esta nota. Revisa tu API Key y vuelve a intentarlo.</p>';
+  }
+};
