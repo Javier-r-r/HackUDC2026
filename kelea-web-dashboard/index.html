@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelea Digital Brain - Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>🧠 Kelea Brain</h2>
+      <nav>
+        <button class="nav-btn active" id="nav-inbox">📥 Inbox (Pendientes)</button>
+          <span id="inbox-badge" class="badge hidden">0</span>
+        <button class="nav-btn" id="nav-processed">📚 Cerebro (Procesados)</button>
+      </nav>
+      <div class="user-info">
+        <p>Usuario Hackathon</p>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header>
+        <h1 id="view-title">📥 Bandeja de Entrada</h1>
+        <div class="header-actions">
+            <button id="btn-dedupe" class="btn-secondary" onclick="cleanDuplicates()" style="margin-right: 10px; border-color: #cf6679; color: #cf6679;">🧹 Limpiar Duplicados</button>
+            
+            <button id="btn-refresh" class="btn-primary">🔄 Actualizar</button>
+        </div>
+      </header>
+
+      <div id="loading" class="hidden">Cargando tu conocimiento... ⏳</div>
+    <!-- Separador entre el loading y el grid -->
+      <div style="height:0.5rem;" aria-hidden="true"></div>
+      <div class="search-container" style="margin-bottom: 20px;">
+        <input type="text" id="search-input" placeholder="🔍 Buscar por título..." style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-dark); color: var(--text-main); font-size: 14px; transition: border-color 0.2s;">
+      </div>
+      <div id="filter-container" class="hidden" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);"></div>
+    
+      <div id="items-grid" class="items-grid"></div>
+    </main>
+
+    <div id="edit-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modal-header-title">✏️ Editar Nota</h3>
+        <input type="hidden" id="modal-id">
+        
+        <label>Categoría</label>
+        <input type="text" id="modal-category">
+        
+        <label>Etiquetas (separadas por coma)</label>
+        <input type="text" id="modal-tags">
+        
+        <label>Contenido / Resumen</label>
+        <textarea id="modal-content" rows="4"></textarea>
+        
+        <div class="modal-actions">
+          <button id="btn-cancel" class="btn-secondary">Cancelar</button>
+          <button id="btn-save" class="btn-primary">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+    <div id="view-modal" class="modal hidden">
+      <div class="modal-content view-modal-content">
+        <div class="modal-header">
+          <span id="view-category" class="card-category"></span>
+          <span id="view-date" style="color:var(--text-muted); font-size:12px;"></span>
+        </div>
+        
+        <h2 id="view-title" style="margin-top: 15px; margin-bottom: 10px; color: var(--text-main);"></h2>
+        <div id="view-tags" class="card-tags" style="margin-bottom: 15px;"></div>
+        
+        <div id="view-content" class="full-content"></div>
+        
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button class="btn-secondary" onclick="closeViewModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

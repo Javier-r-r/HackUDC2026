@@ -1,3 +1,5 @@
+const API_BASE_URL = 'http://192.168.1.10:8000/inbox'; // Apuntando a inbox
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "capture-selection",
@@ -19,54 +21,56 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     title: tab.title || "Página sin título",
     category: "Inbox", 
     tags: [],
-    summary: "", // Iniciamos vacío para que lo llene la IA
     status: "pending" 
   };
 
   if (info.menuItemId === "capture-selection") {
     newItem.type = "text";
-    newItem.content = info.selectionText;
+    newItem.summary = info.selectionText;
     
     chrome.action.setBadgeText({ text: "..." });
 
-    const aiData = await analyzeWithLLM(newItem.content);
+    const aiData = await analyzeWithLLM(newItem.summary);
     if (aiData) {
         newItem.category = aiData.category;
         newItem.tags = aiData.tags;
         newItem.summary = aiData.summary; // 👈 Ahora sí asignamos el resumen de la IA
         // Eliminado el error de pageText
     }
-    
     chrome.action.setBadgeText({ text: "" });
 
   } else if (info.menuItemId === "capture-page") {
     newItem.type = "link";
+    newItem.summary = "Procesando página... ⏳";
+
     chrome.action.setBadgeText({ text: "IA" });
+    chrome.action.setBadgeBackgroundColor({ color: "#bb86fc" });
 
     try {
       const injectionResults = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => document.body.innerText
+        func: () => {
+          const mainContent = document.querySelector('article, main') || document.body;
+          return mainContent.innerText;
+        }
       });
 
       const pageText = injectionResults[0].result;
       const truncatedText = pageText.substring(0, 5000);
-
       const aiData = await summarizePageWithLLM(truncatedText);
 
       if (aiData) {
         newItem.category = aiData.category;
         newItem.tags = aiData.tags;
-        newItem.summary = aiData.summary; // 👈 Aseguramos que se guarde aquí
-        newItem.content = aiData.summary; // Usamos el resumen como contenido principal para links
+        newItem.summary = aiData.summary;
       } else {
-        newItem.content = "Enlace guardado (Sin resumen de IA)";
+        newItem.summary = "Enlace guardado (Sin resumen de IA)";
       }
-    } catch (e) {
-      console.error("Error:", e);
-      newItem.content = "Error extrayendo texto";
-    }
 
+    } catch (e) {
+      console.error("Error extrayendo texto:", e);
+      newItem.summary = "Enlace guardado (No se pudo extraer el texto)";
+    }
     chrome.action.setBadgeText({ text: "" });
   }
 
@@ -75,30 +79,28 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 async function analyzeWithLLM(text) {
   try {
-    // 1. OBTENER LA CLAVE DEL STORAGE
     const result = await chrome.storage.local.get(['apiKey']);
     const apiKey = result.apiKey;
 
     if (!apiKey) {
-      console.warn("⚠️ No hay API Key configurada. Por favor, ve a las opciones de la extensión.");
-      return null; // Devolvemos null para que se guarde sin categorizar pero no de error
+      console.warn("⚠️ No hay API Key configurada.");
+      return null;
     }
 
-    // 2. HACER LA PETICIÓN USANDO LA CLAVE DINÁMICA
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}` // Usamos la variable apiKey aquí
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant", // El modelo actual de Groq
+        model: "llama-3.1-8b-instant",
         messages: [
           {
             role: "system",
             content: `Eres un experto en Personal Knowledge Management (PKM). 
             Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos:
-            1. "category": Una sola palabra que defina el área (ej. Programación, Marketing, Filosofía, Herramienta).
+            1. "category": Una sola palabra que defina el área.
             2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas.
             3. "summary": Un resumen muy conciso (máximo 3 líneas) explicando de qué trata la página y por qué es útil.
             Responde SOLO con el JSON validado, sin texto adicional.`
@@ -109,20 +111,51 @@ async function analyzeWithLLM(text) {
       })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("❌ Groq ha rechazado la petición:", JSON.stringify(errorData, null, 2));
-      return null;
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
-    let resultText = data.choices[0].message.content;
-    resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
-
+    let resultText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(resultText); 
-    
   } catch (error) {
-    console.error("❌ Error grave en la función de IA:", error);
+    console.error("❌ Error en la IA:", error);
+    return null; 
+  }
+}
+
+async function summarizePageWithLLM(text) {
+  try {
+    const result = await chrome.storage.local.get(['apiKey']);
+    if (!result.apiKey) return null;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${result.apiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente experto en PKM. Analiza el siguiente texto y devuelve un JSON estricto con 3 campos:
+            1. "category": Una palabra clave.
+            2. "tags": Array de 1 a 3 etiquetas clave.
+            3. "summary": Un resumen muy conciso (máximo 3 líneas).
+            Responde SOLO con el JSON validado.`
+          },
+          { role: "user", content: text }
+        ],
+        temperature: 0.2
+      })
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    let resultText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(resultText); 
+  } catch (error) {
     return null; 
   }
 }
@@ -173,45 +206,30 @@ async function summarizePageWithLLM(text) {
 
 async function saveToInbox(item) {
   try {
-    const response = await fetch('http://localhost:8000/capture', {  
+    const response = await fetch(API_BASE_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-      content: item.content, 
-      source: item.url,
-      category: item.category,
-      tags: item.tags,
-      summary: item.summary, // 👈 Asegúrate de que esta variable tenga el texto de la IA
-      files: []
-  })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item)
     });
 
-    if (response.ok) {
-        console.log("✅ Captura enviada al Cerebro Digital");
-    }
+    if (!response.ok) throw new Error(`Error en la API: ${response.status}`);
+    console.log("✅ Nota guardada exitosamente en la API");
+    checkPendingNotes(); 
   } catch (error) {
-    console.error("❌ Error enviando al servidor:", error);
-    // Backup local si falla el servidor
-    const result = await chrome.storage.local.get({ inbox: [] });
-    await chrome.storage.local.set({ inbox: [item, ...result.inbox] });
+    console.error("❌ Error guardando en la API:", error);
   }
 }
 
-// background.js de tu extensión
 async function checkPendingNotes() {
   try {
-    const response = await fetch('http://192.168.1.10:8000/inbox');
+    const response = await fetch(API_BASE_URL);
     const items = await response.json();
     const pendingCount = items.filter(item => item.status === 'pending').length;
 
     if (pendingCount > 0) {
-      // Pone el numerito en el icono de la extensión
       chrome.action.setBadgeText({ text: pendingCount.toString() });
       chrome.action.setBadgeBackgroundColor({ color: '#cf6679' });
     } else {
-      // Quita el numerito si está limpio
       chrome.action.setBadgeText({ text: '' });
     }
   } catch (error) {
@@ -219,6 +237,5 @@ async function checkPendingNotes() {
   }
 }
 
-// Que compruebe cada vez que se abre el navegador y luego cada 5 minutos
 checkPendingNotes();
 setInterval(checkPendingNotes, 5 * 60 * 1000);
