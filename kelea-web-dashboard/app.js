@@ -208,6 +208,10 @@ function renderItems() {
     // Le pasamos los datos ya filtrados a la función del grafo
     renderGraph(filteredItems); 
     return; // Paramos aquí para no pintar las tarjetas
+  } else {
+    // Si NO es el grafo, asegurarnos de que la rejilla se ve y el grafo se oculta
+    itemsGrid.classList.remove('hidden');
+    networkGraph.classList.add('hidden');
   }
 
   if (filteredItems.length === 0) {
