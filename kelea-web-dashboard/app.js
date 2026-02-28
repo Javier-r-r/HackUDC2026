@@ -61,11 +61,19 @@ async function fetchItems() {
     }
 
     // Guardamos los datos de TU API en nuestra variable global
-    currentItems = await respuesta.json();
-    console.log("Notas recuperadas del Inbox:", currentItems);
+    let datosCrudos = await respuesta.json();
+    
+    // 🔥 EL TRUCO: Asegurarnos de que todos tienen un 'id' para el frontend
+    currentItems = datosCrudos.map(item => ({
+        ...item,
+        id: item.id || item.filename || item._id || Date.now().toString()
+    }));
 
-    // Llamamos a la función que pinta las tarjetas bonitas
+    console.log("Notas recuperadas (con ID normalizado):", currentItems);
+
+    // Llamamos a la función que pinta las tarjetas
     renderItems();
+    
 
   } catch (error) {
     console.error("No se pudo recuperar el inbox:", error);
@@ -78,28 +86,34 @@ async function fetchItems() {
   }
 }
 // 2. Actualizar nota en la API (PUT/PATCH)
-async function updateItemInAPI(id, updatedData) {
+async function updateItemInAPI(filename, updatedData) {
   try {
+    const safeFilename = encodeURIComponent(filename);
     
-    const response = await fetch(`${API_BASE_URL}/${id}`, {
-      method: 'PATCH', // o PUT dependiendo de tu backend
+    // Ahora sí es un PUT a la URL del recurso específico
+    const response = await fetch(`${API_BASE_URL}/${safeFilename}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedData)
+      body: JSON.stringify({
+        category: updatedData.category || "General",
+        tags: updatedData.tags || [],
+        action: "validate" // Le decimos al backend que queremos validarla
+      })
     });
-    if (!response.ok) throw new Error('Error al actualizar');
     
-    // Simulación para el frontend por ahora
-    console.log("Datos enviados a la API:", id, updatedData);
-    
-    // Actualizamos el estado local para que la UI responda rápido
-    const index = currentItems.findIndex(item => item.id === id);
-    if (index > -1) {
-      currentItems[index] = { ...currentItems[index], ...updatedData };
-      renderItems();
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al actualizar');
     }
+    
+    console.log(`✅ Nota ${filename} actualizada por API REST`);
+    
+    // Recargamos la interfaz
+    await fetchItems(); 
+    
   } catch (error) {
-    console.error("Error al actualizar:", error);
-    alert("Hubo un error al guardar en la nube.");
+    console.error("❌ Error:", error);
+    alert("Hubo un error al guardar: " + error.message);
   }
 }
 
