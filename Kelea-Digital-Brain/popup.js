@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      let mdContent = '# 🧠 Kelea Digital Brain - Inbox Export\n\n';
+      let mdContent = '# 🧠🐦‍⬛ Muninn - Inbox Export\n\n';
       
       pendingItems.forEach(item => {
         const type = (item.type || 'nota').toUpperCase();
@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Kelea-Brain-Export-${Date.now()}.md`;
+      a.download = `Muninn-Export-${Date.now()}.md`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
