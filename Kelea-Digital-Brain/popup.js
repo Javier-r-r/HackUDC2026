@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnClear = document.getElementById('btn-clear');
   const btnMic = document.getElementById('btn-mic');
   
-  const API_BASE_URL = 'http://192.168.1.10:8000/inbox';
+  const API_BASE_URL = 'http://localhost:8000/inbox';
   let isRecording = false; 
 
   tabCapture.addEventListener('click', () => switchTab(tabCapture, viewCapture, tabInbox, viewInbox));
