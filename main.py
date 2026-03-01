@@ -204,6 +204,7 @@ async def delete_note(filename: str):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     
     try:
+        files_to_delete = []
         # 1. Leer metadatos
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
@@ -211,52 +212,44 @@ async def delete_note(filename: str):
         parts = content.split("---")
         if len(parts) >= 3:
             metadata = yaml.safe_load(parts[1])
-            print(f"Metadatos extraídos: {metadata}")
-
-            # Recolectar nombres de archivos de todas las posibles llaves
-            files_to_delete = []
             
             # Revisar 'attached_files' (lista)
             attached = metadata.get("attached_files", [])
-            if not isinstance(adjuntos, list): adjuntos = []
+            if isinstance(attached, list):
+                files_to_delete.extend(attached)
             
             # Revisar 'original_file' (string único)
             original = metadata.get("original_file")
-            if original and original not in adjuntos:
-                adjuntos.append(original)
+            if original and original not in files_to_delete:
+                files_to_delete.append(original)
 
-            # 2. Borrar archivos físicos
-            for file_name in adjuntos:
-                if not file_name: continue
-                
-                # Intentar borrar tanto en INBOX como en BRAIN (por si acaso)
-                for file_name in adjuntos:
-                    if not file_name: continue
-                    adjunto_full_path = os.path.join(INBOX_DIR, file_name)
-                    if os.path.exists(adjunto_full_path):
-                        os.remove(adjunto_full_path)
-                        print(f"✅ Adjunto eliminado: {file_name}")
+        # 2. Borrar archivos físicos
+        for file_name in files_to_delete:
+            if not file_name: continue
+            adjunto_path = os.path.join(INBOX_DIR, file_name)
+            if os.path.exists(adjunto_path):
+                os.remove(adjunto_path)
+                print(f"✅ Adjunto eliminado del disco: {file_name}")
 
-        # 3. Borrar la nota
+        # 3. Borrar el archivo .md
         os.remove(filepath)
-        return {"status": "success", "message": f"Nota y adjuntos de {filename} eliminados."}
+
+        # 4. Eliminar de la base de datos vectorial (Chroma)
+        # Usamos el filename como ID (asegúrate de que coincida con cómo indexas)
+        try:
+            collection.delete(ids=[filename])
+            print(f"✨ Registro eliminado de Chroma: {filename}")
+        except Exception as ve:
+            print(f"⚠️ Nota borrada, pero no se encontró en Chroma: {ve}")
+
+        return {
+            "status": "success", 
+            "message": f"Nota {filename} y sus adjuntos eliminados correctamente."
+        }
 
     except Exception as e:
         print(f"❌ Error al borrar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    inbox_path = os.path.join(INBOX_DIR, filename)
-    if os.path.exists(inbox_path):
-        os.remove(inbox_path)
-        collection.delete(ids=[filename]) # ✨ ELIMINAR DE CHROMA
-        return {"message": "Nota eliminada del Inbox"}
-        
-    brain_path = os.path.join(BRAIN_DIR, filename)
-    if os.path.exists(brain_path):
-        os.remove(brain_path)
-        collection.delete(ids=[filename]) # ✨ ELIMINAR DE CHROMA
-        return {"message": "Nota eliminada del Cerebro"}
-        
-    raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
 # ✨ NUEVO ENDPOINT DE BÚSQUEDA SEMÁNTICA
 @app.get("/search")
