@@ -280,6 +280,23 @@ function createAndAppendCard(item) {
   const card = document.createElement('div');
   card.className = 'inbox-item'; 
 
+  // --- Lógica de Adjuntos (NUEVO) ---
+  let downloadsHTML = '';
+  if (item.download_links && item.download_links.length > 0) {
+    downloadsHTML = `
+      <div class="attachment-section" style="margin: 12px 0; padding: 10px; background: rgba(187, 134, 252, 0.05); border-radius: 8px; border: 1px solid rgba(187, 134, 252, 0.2);">
+        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: bold;">📎 ARCHIVOS ADJUNTOS:</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          ${item.download_links.map(link => `
+            <a href="${link.url}" download="${link.name}" class="btn-download" 
+               style="text-decoration:none; font-size:11px; padding: 6px 12px; background: #bb86fc; color: #000; border-radius: 6px; font-weight: bold; display: flex; align-items: center; gap: 5px; transition: transform 0.1s;">
+               📥 Descargar ${link.name.split('.').pop().toUpperCase()}
+            </a>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
   // Normalizar tags
   let tagsArray = [];
   if (Array.isArray(item.tags)) {
@@ -293,41 +310,36 @@ function createAndAppendCard(item) {
     : '';
 
   const safeType = item.type || 'text';
-  const typeIcon = safeType === 'link' ? '🔗' : safeType === 'text' ? '📝' : '💡';
+  const typeIcon = safeType === 'link' ? '🔗' : (safeType === 'audio' ? '🎙️' : '📝');
   const status = item.status || 'pending';
   
   const statusBadge = status === 'pending' 
       ? `<span class="status-badge status-pending" style="background-color: #cf6679; color: #121212; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">PENDIENTE</span>` 
-      : `<span class="status-badge status-processed" style="background-color: #4caf50; color: #121212; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">PROCESADO</span>`;
+      : `<span class="status-badge status-processed" style="background-color: #4caf50; color: #121212; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">CEREBRO</span>`;
 
-  // Si está procesado, dejamos abrir el modal de lectura/edición
   if (status === 'processed') {
     card.style.cursor = 'pointer';
     card.setAttribute('onclick', `openModal('${item.id}')`);
   }
 
-  // Montar HTML de la tarjeta
   card.innerHTML = `
     <div class="item-meta" style="align-items: center; justify-content: space-between; display: flex;">
-    <span><strong>${item.title || 'Sin título'}</strong> ${typeIcon} ${safeType.toUpperCase()}</span>
+    <span><strong>${item.title || 'Sin título'}</strong> ${typeIcon}</span>
       ${statusBadge}
     </div>
         
-    <p class="item-content" style="margin-top: 10px; margin-bottom: 15px;">
-      ${(item.summary || item.content || '').substring(0, 300)}${(item.summary || item.content || '').length > 300 ? '...' : ''}
+    <p class="item-content" style="margin-top: 10px; margin-bottom: 10px; color: #bbb; line-height: 1.5;">
+      ${(item.summary || item.content || '').substring(0, 300)}...
     </p>
-        
-    ${status === 'pending' ? `
+
+    ${downloadsHTML} ${status === 'pending' ? `
         <div class="inline-triage" style="background: rgba(255, 255, 255, 0.03); padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed var(--border);">
-        <div style="margin-bottom: 8px;">
-            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">📂 Categoría (Propuesta por IA):</label>
-            <input type="text" id="edit-cat-${item.id}" value="${item.category || ''}" onclick="event.stopPropagation()" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text-main); font-size:12px;">
-        </div>
-        
-        <div>
-            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">🏷️ Etiquetas (separadas por coma):</label>
-            <input type="text" id="edit-tags-${item.id}" value="${tagsArray.join(', ')}" onclick="event.stopPropagation()" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text-main); font-size:12px;">
-        </div>
+          <div style="margin-bottom: 8px;">
+              <input type="text" id="edit-cat-${item.id}" value="${item.category || ''}" placeholder="Categoría..." onclick="event.stopPropagation()" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text-main); font-size:12px;">
+          </div>
+          <div>
+              <input type="text" id="edit-tags-${item.id}" value="${tagsArray.join(', ')}" placeholder="Etiquetas..." onclick="event.stopPropagation()" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--bg-dark); color:var(--text-main); font-size:12px;">
+          </div>
         </div>
     ` : ''}
 

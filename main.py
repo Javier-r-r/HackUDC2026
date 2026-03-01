@@ -11,6 +11,9 @@ import base64
 import pdfplumber
 import chromadb
 from chromadb.utils import embedding_functions
+from fastapi.staticfiles import StaticFiles
+BASE_DIR = "digital_brain"
+INBOX_DIR = os.path.join(BASE_DIR, "inbox")
 
 # --- CONFIGURACIÓN DE IA (GROQ) ---
 # PON TU API KEY AQUÍ:
@@ -101,6 +104,8 @@ def process_with_ai(file_path, filename):
 
 # --- CONFIGURACIÓN BASE ---
 app = FastAPI(title="Kelea Digital Brain API")
+
+app.mount("/view_file", StaticFiles(directory=INBOX_DIR), name="static_files")
 
 app.add_middleware(
     CORSMiddleware,
@@ -253,14 +258,28 @@ async def list_inbox():
                     meta = yaml.safe_load(parts[1])
                     meta["filename"] = f
 
-                    original_name = meta.get("original_file")
-                    if original_name:
-                        file_path = os.path.join(INBOX_DIR, original_name)
-                        if os.path.exists(file_path):
-                            meta["download_url"] = f"http://localhost:8000/download/{original_name}"
-                        else:
-                            meta["download_url"] = None
+                    # 1. Recopilar todos los adjuntos (lista o único)
+                    adjuntos = meta.get("attached_files", [])
+                    if not isinstance(adjuntos, list):
+                        adjuntos = []
+                    
+                    orig = meta.get("original_file")
+                    if orig and orig not in adjuntos:
+                        adjuntos.append(orig)
 
+                    # 2. Generar el campo 'download_links' que espera el Dashboard
+                    links = []
+                    for name in adjuntos:
+                        if name:
+                            file_path = os.path.join(INBOX_DIR, name)
+                            if os.path.exists(file_path):
+                                links.append({
+                                    "name": name,
+                                    "url": f"http://localhost:8000/view_file/{name}"
+                                })
+                    
+                    # 3. Inyectar la lista en el objeto meta
+                    meta["download_links"] = links
                     files.append(meta)
     return files
 
