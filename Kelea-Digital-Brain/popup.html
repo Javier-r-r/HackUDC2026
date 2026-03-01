@@ -19,6 +19,16 @@
 
     <textarea id="quick-note" placeholder="Escribe una idea brillante..."></textarea>
 
+
+    <div class="file-actions" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+      <label for="multi-file-input" class="btn-secondary" style="cursor: pointer; text-align: center;">
+        Adjuntar Archivos (PDF, Audio, etc.)
+      </label>
+      <input type="file" id="multi-file-input" style="display:none" multiple accept=".pdf,.mp3,.wav,.doc,.docx,.png,.jpg">
+        
+      <div id="selected-files-list" style="margin-top: 5px; max-height: 100px; overflow-y: auto;"></div>
+    </div>
+    
     <div style="display: flex; gap: 8px;">
       <button id="btn-save" class="btn-primary" style="flex: 1;">📝 Guardar Idea</button>
       <button id="btn-mic" class="btn-secondary" style="margin-top: 0; width: auto; padding: 10px 15px;" title="Grabar nota de voz">🎙️</button>
@@ -35,4 +45,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>
