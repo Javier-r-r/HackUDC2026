@@ -191,5 +191,15 @@ async function checkPendingNotes() {
   }
 }
 
+
+// Alarma para verificar notas periódicamente
+chrome.alarms.create("checkPendingNotes", { periodInMinutes: 1 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "checkPendingNotes") {
+    checkPendingNotes();
+  }
+});
+
+// También verificamos al inicio
 checkPendingNotes();
-setInterval(checkPendingNotes, 5 * 60 * 1000);

@@ -8,12 +8,98 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
 import base64
-
-# --- NUEVOS IMPORTS PARA IA VECTORIAL ---
+import pdfplumber
 import chromadb
 from chromadb.utils import embedding_functions
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DE IA (GROQ) ---
+# PON TU API KEY AQUÍ:
+client = Groq()
+
+def extract_text_from_pdf(file_path):
+    """Extrae el texto de un PDF de forma robusta (Solo las primeras 5 páginas)"""
+    text = ""
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            for i, page in enumerate(pdf.pages):
+                if i >= 5: 
+                    break
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+                    
+        print(f"✅ Extraídos {len(text)} caracteres del PDF para la IA.")
+        return text.strip()
+    except Exception as e:
+        print(f"❌ Error leyendo PDF con pdfplumber: {e}")
+        return ""
+
+def process_with_ai(file_path, filename):
+    """Detecta si es audio o texto, lo procesa y devuelve un JSON con categoría, tags y resumen"""
+    ext = filename.split('.')[-1].lower()
+    text_content = ""
+
+    try:
+        if ext in ['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm']:
+            print(f"🎙️ Transcribiendo audio {filename} con Whisper...")
+            with open(file_path, "rb") as file:
+                transcription = client.audio.transcriptions.create(
+                  file=(filename, file.read()),
+                  model="whisper-large-v3",
+                  response_format="json", # Aseguramos formato correcto
+                  language="es"
+                )
+            # Extraemos el texto de la respuesta de Groq
+            text_content = transcription.text
+            
+        elif ext == 'pdf':
+            print(f"📄 Extrayendo texto del PDF {filename}...")
+            text_content = extract_text_from_pdf(file_path)
+            
+        elif ext in ['txt', 'md', 'csv']:
+            print(f"📄 Leyendo texto plano de {filename}...")
+            with open(file_path, "r", encoding="utf-8") as file:
+                text_content = file.read()
+        else:
+            print(f"⚠️ Formato no soportado por IA: {ext}")
+            return None
+
+        if not text_content:
+            print("⚠️ No se extrajo texto del archivo. La IA no actuará.")
+            return None
+
+        print("🧠 Analizando contenido con LLaMA...")
+        prompt = f"""Eres un asistente PKM. Analiza el siguiente texto y devuelve un JSON estricto.
+        Estructura requerida:
+        {{
+            "category": "Una palabra clave (ej. Apuntes, Reunión, Programación)",
+            "tags": ["tag1", "tag2"],
+            "summary": "Un resumen muy conciso (máximo 3 líneas) de lo que trata."
+        }}
+        
+        Texto a analizar:
+        {text_content[:4000]}"""
+
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.1-8b-instant",
+            temperature=0.2,
+            response_format={"type": "json_object"} # 🔥 Obligamos a que sea JSON válido
+        )
+        
+        raw_json = chat_completion.choices[0].message.content
+        result_data = json.loads(raw_json)
+        
+        # Guardamos el texto completo para el contenido de la nota
+        result_data["full_text"] = text_content 
+        print(f"✨ ¡Éxito! IA asignó la categoría: {result_data.get('category')}")
+        return result_data
+
+    except Exception as e:
+        print(f"❌ Error interno en process_with_ai: {e}")
+        return None
+
+# --- CONFIGURACIÓN BASE ---
 app = FastAPI(title="Kelea Digital Brain API")
 
 app.add_middleware(
@@ -24,17 +110,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Directorios de almacenamiento
 BASE_DIR = "digital_brain"
 INBOX_DIR = os.path.join(BASE_DIR, "inbox")
-BRAIN_DIR = os.path.join(BASE_DIR, "permanent_notes")
 
-for folder in [INBOX_DIR, BRAIN_DIR]:
+for folder in [INBOX_DIR]:
     os.makedirs(folder, exist_ok=True)
 
-# --- INICIALIZAR CHROMA DB (BASE VECTORIAL) ---
 chroma_client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "chroma_db"))
-# Usamos un modelo multilenguaje ligero y rápido
 sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="paraphrase-multilingual-MiniLM-L12-v2")
 
 collection = chroma_client.get_or_create_collection(
@@ -42,7 +124,7 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=sentence_transformer_ef
 )
 
-# --- MODELOS DE DATOS ---
+# --- MODELOS ---
 class FileData(BaseModel):
     name: str
     base64: str
@@ -61,42 +143,60 @@ class UpdateRequest(BaseModel):
     status: Optional[str] = None
     action: Optional[str] = None
 
-
 # --- ENDPOINTS ---
-
 @app.post("/capture")
 async def capture_entry(data: MultiCaptureRequest):
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     saved_files = []
     
     if data.files:
         for file in data.files:
             file_path = os.path.join(INBOX_DIR, file.name)
+            
+            # 🔥 LA SOLUCIÓN MÁGICA: Limpiar el prefijo 'data:...' de Javascript
+            b64_data = file.base64
+            if "," in b64_data:
+                b64_data = b64_data.split(",")[1]
+                
+            # Ahora sí, guardamos el archivo perfectamente sano
             with open(file_path, "wb") as f:
-                f.write(base64.b64decode(file.base64))
+                f.write(base64.b64decode(b64_data))
             
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"note_{timestamp}_{file.name}.md"
             
+            # ✨ Llamamos a la IA con el archivo sano
+            ai_data = process_with_ai(file_path, file.name)
+            
+            final_category = data.category or "Inbox"
+            final_tags = data.tags or []
+            final_summary = "Archivo adjunto (sin procesar)"
+            final_content = f"Archivo adjunto original: [{file.name}](http://localhost:8000/download/{file.name})"
+
+            if ai_data:
+                final_category = ai_data.get("category", final_category)
+                final_tags = ai_data.get("tags", final_tags)
+                final_summary = ai_data.get("summary", final_summary)
+                final_content = f"**Contenido Extraído / Transcripción:**\n\n> {ai_data.get('full_text', '')}"
+
             metadata = {
                 "title": file.name,
                 "date": datetime.now().isoformat(),
                 "source": data.source,
-                "type": "file",
+                "type": "audio" if file.name.split('.')[-1].lower() in ['mp3', 'wav', 'm4a'] else "file",
                 "status": "pending",
-                "category": data.category,
-                "tags": data.tags,
-                "summary": data.summary or "Archivo adjunto",
+                "category": final_category,
+                "tags": final_tags,
+                "summary": final_summary,
+                "attached_files": [file.name],
                 "original_file": file.name
             }
             
-            md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n{data.content}"
+            md_body = f"---\n{yaml.dump(metadata)}---\n\n# {metadata['summary']}\n\n{final_content}"
             with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
                 f.write(md_body)
             saved_files.append(file.name)
             
-            # ✨ INDEXAR EN CHROMA (Archivo)
-            texto_a_indexar = f"{metadata['title']} {metadata['summary']} {data.content}"
+            texto_a_indexar = f"{metadata['title']} {metadata['summary']} {final_content}"
             collection.upsert(documents=[texto_a_indexar], metadatas=[{"title": metadata["title"], "category": metadata["category"]}], ids=[filename])
 
     elif data.content:
@@ -120,7 +220,6 @@ async def capture_entry(data: MultiCaptureRequest):
             f.write(md_body)
         saved_files.append(filename)
 
-        # ✨ INDEXAR EN CHROMA (Texto)
         texto_a_indexar = f"{metadata['summary']} {data.content}"
         collection.upsert(documents=[texto_a_indexar], metadatas=[{"title": metadata["title"], "category": metadata["category"]}], ids=[filename])
 
@@ -137,7 +236,6 @@ async def save_direct_to_inbox(item: dict):
     with open(os.path.join(INBOX_DIR, filename), "w", encoding="utf-8") as f:
         f.write(md_body)
         
-    # ✨ INDEXAR EN CHROMA (Entrada directa)
     texto_a_indexar = f"{item.get('title', '')} {item.get('summary', item.get('content', ''))}"
     collection.upsert(documents=[texto_a_indexar], metadatas=[{"title": item.get('title', 'Sin título'), "category": item.get('category', 'Inbox')}], ids=[filename])
 
@@ -205,7 +303,6 @@ async def delete_note(filename: str):
     
     try:
         files_to_delete = []
-        # 1. Leer metadatos
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
             
@@ -213,45 +310,32 @@ async def delete_note(filename: str):
         if len(parts) >= 3:
             metadata = yaml.safe_load(parts[1])
             
-            # Revisar 'attached_files' (lista)
             attached = metadata.get("attached_files", [])
             if isinstance(attached, list):
                 files_to_delete.extend(attached)
             
-            # Revisar 'original_file' (string único)
             original = metadata.get("original_file")
             if original and original not in files_to_delete:
                 files_to_delete.append(original)
 
-        # 2. Borrar archivos físicos
         for file_name in files_to_delete:
             if not file_name: continue
             adjunto_path = os.path.join(INBOX_DIR, file_name)
             if os.path.exists(adjunto_path):
                 os.remove(adjunto_path)
-                print(f"✅ Adjunto eliminado del disco: {file_name}")
 
-        # 3. Borrar el archivo .md
         os.remove(filepath)
 
-        # 4. Eliminar de la base de datos vectorial (Chroma)
-        # Usamos el filename como ID (asegúrate de que coincida con cómo indexas)
         try:
             collection.delete(ids=[filename])
-            print(f"✨ Registro eliminado de Chroma: {filename}")
-        except Exception as ve:
-            print(f"⚠️ Nota borrada, pero no se encontró en Chroma: {ve}")
+        except Exception:
+            pass
 
-        return {
-            "status": "success", 
-            "message": f"Nota {filename} y sus adjuntos eliminados correctamente."
-        }
+        return {"status": "success"}
 
     except Exception as e:
-        print(f"❌ Error al borrar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ✨ NUEVO ENDPOINT DE BÚSQUEDA SEMÁNTICA
 @app.get("/search")
 async def semantic_search(query: str, limit: int = 10):
     try:
@@ -268,7 +352,6 @@ async def semantic_search(query: str, limit: int = 10):
         
         found_notes = []
         for idx, fname in enumerate(matched_filenames):
-            # Asumimos que están en INBOX_DIR porque tienes todo ahí ahora
             filepath = os.path.join(INBOX_DIR, fname)
             if os.path.exists(filepath):
                 with open(filepath, "r", encoding="utf-8") as file:

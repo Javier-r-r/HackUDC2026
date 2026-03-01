@@ -58,8 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         div.className = 'inbox-item';
         
         const safeType = item.type || 'text';
-        const typeIcon = safeType === 'link' ? '🔗' : safeType === 'text' ? '📝' : '💡';
-        
+        const typeIcon = safeType === 'link' ? '🔗' : (safeType === 'text' || safeType === 'file') ? '📝' : '💡';        
         const tagsHTML = item.tags && item.tags.length > 0 
           ? item.tags.map(tag => `<span class="tag">#${tag}</span>`).join(' ') 
           : '';
@@ -451,7 +450,7 @@ filesDisplay.addEventListener('click', (e) => {
     };
 
     try {
-      const response = await fetch('http://192.168.1.10:8000/capture', {
+      const response = await fetch('http://localhost:8000/capture', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
