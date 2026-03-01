@@ -369,4 +369,104 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   });
+
+  // Dentro de DOMContentLoaded
+  let attachedFiles = [];
+  const fileInput = document.getElementById('multi-file-input');
+  const filesDisplay = document.getElementById('selected-files-list');
+
+  fileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    
+    files.forEach(file => {
+        // Validamos que el archivo exista
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const fileObject = {
+                id: crypto.randomUUID(), // ID único más robusto
+                name: file.name || "Archivo sin nombre",
+                size: (file.size / 1024).toFixed(1) + " KB",
+                base64: reader.result.split(',')[1]
+            };
+            
+            attachedFiles.push(fileObject);
+            console.log("Archivo añadido:", fileObject.name);
+            updateFilesUI();
+        };
+        reader.readAsDataURL(file);
+    });
+    fileInput.value = ""; 
+  });
+
+// Función para refrescar la lista
+function updateFilesUI() {
+    filesDisplay.innerHTML = ''; 
+    
+    attachedFiles.forEach(file => {
+        const item = document.createElement('div');
+        item.className = "file-item-row"; // Usamos una clase para el CSS
+        item.style = "display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px; margin-bottom: 4px; font-size: 11px;";
+        
+        item.innerHTML = `
+            <span style="color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
+                📄 ${file.name}
+            </span>
+            <button class="btn-remove-file" data-id="${file.id}" style="background: none; border: none; color: #cf6679; cursor: pointer; font-weight: bold; padding: 0 8px;">✕</button>
+        `;
+        
+        filesDisplay.appendChild(item);
+    });
+}
+
+// 🟢 DELEGACIÓN DE EVENTOS PARA EL BORRADO
+// Esto soluciona que la X no responda
+filesDisplay.addEventListener('click', (e) => {
+    if (e.target.classList.contains('btn-remove-file')) {
+        const idToRemove = e.target.getAttribute('data-id');
+        attachedFiles = attachedFiles.filter(f => f.id !== idToRemove);
+        console.log("Archivo eliminado, quedan:", attachedFiles.length);
+        updateFilesUI();
+    }
+});
+
+// Modificación del evento btnSave.addEventListener
+  btnSave.addEventListener('click', async () => {
+    const text = quickNote.value.trim();
+    if (!text && attachedFiles.length === 0) return;
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    // Llamamos a la IA para categorizar la nota/archivos
+    const aiData = await analyzeTextInPopup(text || "Archivos adjuntos");
+
+    const payload = {
+        content: text,
+        source: tab?.url || 'Manual',
+        category: aiData?.category || 'Inbox',
+        tags: aiData?.tags || [],
+        summary: text ? text.substring(0, 50) : "Adjuntos: " + attachedFiles[0].name,
+        files: attachedFiles // Se envían los archivos que quedaron en la lista
+    };
+
+    try {
+      const response = await fetch('http://192.168.1.10:8000/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+          // LIMPIEZA TRAS ÉXITO
+          attachedFiles = [];
+          quickNote.value = '';
+          updateFilesUI(); // Esto vaciará la lista visualmente
+          statusMsg.innerText = "✅ Guardado correctamente";
+          // ...
+      }
+    } catch (error) {
+        console.error("Error:", error);
+    }
+  });
 });

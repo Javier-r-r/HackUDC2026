@@ -66,6 +66,7 @@ class UpdateRequest(BaseModel):
 
 @app.post("/capture")
 async def capture_entry(data: MultiCaptureRequest):
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     saved_files = []
     
     if data.files:
@@ -197,6 +198,52 @@ async def update_inbox_note(filename: str, req: UpdateRequest):
 
 @app.delete("/inbox/{filename}")
 async def delete_note(filename: str):
+    filepath = os.path.join(INBOX_DIR, filename)
+    
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    
+    try:
+        # 1. Leer metadatos
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        parts = content.split("---")
+        if len(parts) >= 3:
+            metadata = yaml.safe_load(parts[1])
+            print(f"Metadatos extraídos: {metadata}")
+
+            # Recolectar nombres de archivos de todas las posibles llaves
+            files_to_delete = []
+            
+            # Revisar 'attached_files' (lista)
+            attached = metadata.get("attached_files", [])
+            if not isinstance(adjuntos, list): adjuntos = []
+            
+            # Revisar 'original_file' (string único)
+            original = metadata.get("original_file")
+            if original and original not in adjuntos:
+                adjuntos.append(original)
+
+            # 2. Borrar archivos físicos
+            for file_name in adjuntos:
+                if not file_name: continue
+                
+                # Intentar borrar tanto en INBOX como en BRAIN (por si acaso)
+                for file_name in adjuntos:
+                    if not file_name: continue
+                    adjunto_full_path = os.path.join(INBOX_DIR, file_name)
+                    if os.path.exists(adjunto_full_path):
+                        os.remove(adjunto_full_path)
+                        print(f"✅ Adjunto eliminado: {file_name}")
+
+        # 3. Borrar la nota
+        os.remove(filepath)
+        return {"status": "success", "message": f"Nota y adjuntos de {filename} eliminados."}
+
+    except Exception as e:
+        print(f"❌ Error al borrar: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     inbox_path = os.path.join(INBOX_DIR, filename)
     if os.path.exists(inbox_path):
         os.remove(inbox_path)
