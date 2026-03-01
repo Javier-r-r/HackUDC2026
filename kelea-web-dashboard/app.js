@@ -622,7 +622,7 @@ window.exportItemToMD = (id) => {
   const content = item.content || item.summary || 'Sin contenido';
 
   // 3. Montamos el contenido en formato Markdown bonito
-  let mdContent = `# 🧠 Kelea Digital Brain - Nota Exportada\n\n`;
+  let mdContent = `# 🧠🐦‍⬛ Muninn - Nota Exportada\n\n`;
   mdContent += `## [${type}] ${title}\n`;
   mdContent += `- **Fecha:** ${date}\n`;
   mdContent += `- **Categoría:** ${category}\n`;

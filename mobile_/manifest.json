@@ -1,11 +1,11 @@
 {
   "name": "Cerebro Digital",
-  "short_name": "Cerebro",
+  "short_name": "Muninn",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#bb86fc",
-  "description": "Tu segundo cerebro impulsado por IA",
+  "description": "Catch your thoughts",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2103/2103832.png",
