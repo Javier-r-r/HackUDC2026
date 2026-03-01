@@ -42,7 +42,7 @@ El proyecto se divide en 3 pilares fundamentales:
 ### 1. Iniciar el Backend (API)
 Asegúrate de tener Python instalado. Abre una terminal en la carpeta del backend:
 ```bash
-pip install fastapi uvicorn
+pip install fastapi uvicorn pyyaml groq chromadb sentence-transformers pdfplumber
 # Añade aquí cualquier otra dependencia que uses (ej: openai, requests...)
 
 # Iniciar el servidor
