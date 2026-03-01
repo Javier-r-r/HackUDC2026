@@ -315,7 +315,7 @@ function createAndAppendCard(item) {
   
   const statusBadge = status === 'pending' 
       ? `<span class="status-badge status-pending" style="background-color: #cf6679; color: #121212; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">PENDIENTE</span>` 
-      : `<span class="status-badge status-processed" style="background-color: #4caf50; color: #121212; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">CEREBRO</span>`;
+      : `<span class="status-badge status-processed" style="background-color: #4caf50; color: #121212; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">PROCESADO</span>`;
 
   if (status === 'processed') {
     card.style.cursor = 'pointer';
