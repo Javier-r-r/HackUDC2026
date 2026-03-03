@@ -1,5 +1,8 @@
-const API_BASE_URL = 'http://localhost:8000/inbox'; // Apuntando a inbox
+const API_BASE_URL = 'http://localhost:8000/inbox';
 
+/**
+ * Create context menu entries when the extension is installed.
+ */
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "capture-selection",
@@ -13,21 +16,24 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+/**
+ * Handle context menu clicks for selection and page captures.
+ */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const newItem = {
     id: Date.now().toString(),
     timestamp: new Date().toISOString(),
     url: info.pageUrl || tab.url,
     title: tab.title || "Página sin título",
-    category: "Inbox", 
+    category: "Inbox",
     tags: [],
-    status: "pending" 
+    status: "pending"
   };
 
   if (info.menuItemId === "capture-selection") {
     newItem.type = "text";
     newItem.summary = info.selectionText;
-    
+
     chrome.action.setBadgeText({ text: "..." });
     chrome.action.setBadgeBackgroundColor({ color: "#bb86fc" });
 
@@ -76,6 +82,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   await saveToInbox(newItem);
 });
 
+/**
+ * Analyze a text string using the configured LLM and return parsed JSON
+ * with `category` and `tags` or null on failure.
+ * @param {string} text
+ * @returns {Promise<{category:string,tags:string[]}|null>}
+ */
 async function analyzeWithLLM(text) {
   try {
     const result = await chrome.storage.local.get(['apiKey']);
@@ -97,11 +109,7 @@ async function analyzeWithLLM(text) {
         messages: [
           {
             role: "system",
-            content: `Eres un experto en Personal Knowledge Management (PKM). 
-            Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos:
-            1. "category": Una sola palabra que defina el área.
-            2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas.
-            Responde SOLO con el JSON validado, sin texto adicional.`
+            content: `Eres un experto en Personal Knowledge Management (PKM). Tu tarea es analizar el texto del usuario y devolver un JSON estricto con dos campos: 1. "category": Una sola palabra que defina el área. 2. "tags": Un array de 1 a 3 etiquetas clave en minúsculas. Responde SOLO con el JSON validado, sin texto adicional.`
           },
           { role: "user", content: text }
         ],
@@ -113,13 +121,19 @@ async function analyzeWithLLM(text) {
 
     const data = await response.json();
     let resultText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(resultText); 
+    return JSON.parse(resultText);
   } catch (error) {
     console.error("❌ Error en la IA:", error);
-    return null; 
+    return null;
   }
 }
 
+/**
+ * Summarize a larger page text using the LLM and return parsed JSON
+ * with `category`, `tags` and `summary` or null on failure.
+ * @param {string} text
+ * @returns {Promise<{category:string,tags:string[],summary:string}|null>}
+ */
 async function summarizePageWithLLM(text) {
   try {
     const result = await chrome.storage.local.get(['apiKey']);
@@ -136,11 +150,7 @@ async function summarizePageWithLLM(text) {
         messages: [
           {
             role: "system",
-            content: `Eres un asistente experto en PKM. Analiza el siguiente texto y devuelve un JSON estricto con 3 campos:
-            1. "category": Una palabra clave.
-            2. "tags": Array de 1 a 3 etiquetas clave.
-            3. "summary": Un resumen muy conciso (máximo 3 líneas).
-            Responde SOLO con el JSON validado.`
+            content: `Eres un asistente experto en PKM. Analiza el siguiente texto y devuelve un JSON estricto con 3 campos: 1. "category": Una palabra clave. 2. "tags": Array de 1 a 3 etiquetas clave. 3. "summary": Un resumen muy conciso (máximo 3 líneas). Responde SOLO con el JSON validado.`
           },
           { role: "user", content: text }
         ],
@@ -152,12 +162,16 @@ async function summarizePageWithLLM(text) {
 
     const data = await response.json();
     let resultText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(resultText); 
+    return JSON.parse(resultText);
   } catch (error) {
-    return null; 
+    return null;
   }
 }
 
+/**
+ * Save a note/item to the backend inbox API and refresh badge count.
+ * @param {Object} item
+ */
 async function saveToInbox(item) {
   try {
     const response = await fetch(API_BASE_URL, {
@@ -168,12 +182,15 @@ async function saveToInbox(item) {
 
     if (!response.ok) throw new Error(`Error en la API: ${response.status}`);
     console.log("✅ Nota guardada exitosamente en la API");
-    checkPendingNotes(); 
+    checkPendingNotes();
   } catch (error) {
     console.error("❌ Error guardando en la API:", error);
   }
 }
 
+/**
+ * Query the inbox and update the extension badge with pending notes count.
+ */
 async function checkPendingNotes() {
   try {
     const response = await fetch(API_BASE_URL);
@@ -191,15 +208,15 @@ async function checkPendingNotes() {
   }
 }
 
-
-// Alarma para verificar notas periódicamente
 chrome.alarms.create("checkPendingNotes", { periodInMinutes: 1 });
 
+/**
+ * Alarm handler - used to periodically refresh pending notes count.
+ */
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "checkPendingNotes") {
     checkPendingNotes();
   }
 });
 
-// También verificamos al inicio
 checkPendingNotes();

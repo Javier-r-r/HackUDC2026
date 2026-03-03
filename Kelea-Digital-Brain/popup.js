@@ -1,3 +1,6 @@
+/**
+ * Initialize popup UI, bind event handlers and provide helper functions.
+ */
 document.addEventListener('DOMContentLoaded', async () => {
   const tabCapture = document.getElementById('tab-capture');
   const tabInbox = document.getElementById('tab-inbox');
@@ -20,6 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderInbox();
   });
 
+  /**
+   * Switch visible tab and corresponding view.
+   * @param {HTMLElement} activeTab
+   * @param {HTMLElement} activeView
+   * @param {HTMLElement} inactiveTab
+   * @param {HTMLElement} inactiveView
+   */
   function switchTab(activeTab, activeView, inactiveTab, inactiveView) {
     activeTab.classList.add('active');
     activeView.classList.add('active');
@@ -27,6 +37,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     inactiveView.classList.remove('active');
   }
 
+  /**
+   * POST a new item to the backend inbox API.
+   * @param {Object} newItem
+   */
   async function saveToAPI(newItem) {
     await fetch(API_BASE_URL, {
       method: 'POST',
@@ -35,13 +49,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  /**
+   * Render pending inbox items in the popup UI.
+   */
   async function renderInbox() {
     inboxList.innerHTML = '<p style="color:var(--text-muted); text-align:center;">Cargando notas...</p>';
-    
+
     try {
       const response = await fetch(API_BASE_URL);
       if (!response.ok) throw new Error("Error de red");
-      
+
       const allItems = await response.json();
       const pendingItems = allItems.filter(item => item.status === 'pending');
 
@@ -56,16 +73,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const safeId = item.id || item.filename || item._id;
         const div = document.createElement('div');
         div.className = 'inbox-item';
-        
+
         const safeType = item.type || 'text';
-        const typeIcon = safeType === 'link' ? '🔗' : (safeType === 'text' || safeType === 'file') ? '📝' : '💡';        
-        const tagsHTML = item.tags && item.tags.length > 0 
-          ? item.tags.map(tag => `<span class="tag">#${tag}</span>`).join(' ') 
+        const typeIcon = safeType === 'link' ? '🔗' : (safeType === 'text' || safeType === 'file') ? '📝' : '💡';
+        const tagsHTML = item.tags && item.tags.length > 0
+          ? item.tags.map(tag => `<span class="tag">#${tag}</span>`).join(' ')
           : '';
-        
+
         const categoryHTML = item.category ? `<span class="category">[${item.category}]</span>` : '';
         const commentHTML = item.personalComment ? `<p style="font-size: 12px; color: var(--primary); font-style: italic; margin-top: 6px; background: #2a1f3d; padding: 6px; border-radius: 4px;">💬 ${item.personalComment}</p>` : '';
-        
+
         div.innerHTML = `
           <div class="item-meta" style="align-items: center;">
             <span>${typeIcon} ${safeType.toUpperCase()} ${categoryHTML}</span>
@@ -74,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <p class="item-content">${(item.summary || item.content || '').substring(0, 150)}...</p>
           <div class="item-tags">${tagsHTML}</div>
           ${commentHTML}
-          
+
           <div class="edit-form hidden" id="edit-form-${safeId}">
             <label style="font-size:11px; color:var(--text-muted)">Modificar Categoría:</label>
             <input type="text" id="edit-cat-${safeId}" value="${item.category || ''}">
@@ -90,6 +107,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  /**
+   * Update an inbox item's metadata via the API.
+   * @param {string} id
+   * @param {string|null} newCategory
+   * @param {string|null} newTagsStr
+   * @param {string} newStatus
+   */
   async function updateItemData(id, newCategory, newTagsStr, newStatus) {
     try {
       const updatedData = { status: newStatus };
@@ -105,14 +129,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData)
       });
-      
-      renderInbox(); 
+
+      renderInbox();
     } catch (error) {
       console.error("Error al actualizar:", error);
       alert("Error al guardar en el servidor.");
     }
   }
 
+  /**
+   * Call the LLM to analyze a short piece of text and return parsed JSON
+   * with `category` and `tags`, or null on failure.
+   * @param {string} text
+   * @returns {Promise<{category:string,tags:string[]}|null>}
+   */
   async function analyzeTextInPopup(text) {
     try {
       const result = await chrome.storage.local.get(['apiKey']);
@@ -129,10 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           messages: [
             {
               role: "system",
-              content: `Eres un experto en PKM. Analiza esta nota y devuelve un JSON estricto:
-              1. "category": Una palabra clave.
-              2. "tags": Array de 1 a 3 etiquetas en minúsculas.
-              Responde SOLO con el JSON.`
+              content: `Eres un experto en PKM. Analiza esta nota y devuelve un JSON estricto: 1. "category": Una palabra clave. 2. "tags": Array de 1 a 3 etiquetas en minúsculas. Responde SOLO con el JSON.`
             },
             { role: "user", content: text }
           ],
@@ -149,7 +176,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Exportar arreglado (Lee de la API)
   btnExport.addEventListener('click', async () => {
     try {
       const response = await fetch(API_BASE_URL);
@@ -369,65 +395,66 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Dentro de DOMContentLoaded
   let attachedFiles = [];
   const fileInput = document.getElementById('multi-file-input');
   const filesDisplay = document.getElementById('selected-files-list');
 
-  fileInput.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files);
-    
-    files.forEach(file => {
-        // Validamos que el archivo exista
-        if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = () => {
-            const fileObject = {
-                id: crypto.randomUUID(), // ID único más robusto
-                name: file.name || "Archivo sin nombre",
-                size: (file.size / 1024).toFixed(1) + " KB",
-                base64: reader.result.split(',')[1]
-            };
-            
-            attachedFiles.push(fileObject);
-            console.log("Archivo añadido:", fileObject.name);
-            updateFilesUI();
+    files.forEach(file => {
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const fileObject = {
+          id: crypto.randomUUID(),
+          name: file.name || "Archivo sin nombre",
+          size: (file.size / 1024).toFixed(1) + " KB",
+          base64: reader.result.split(',')[1]
         };
-        reader.readAsDataURL(file);
+
+        attachedFiles.push(fileObject);
+        console.log("Archivo añadido:", fileObject.name);
+        updateFilesUI();
+      };
+      reader.readAsDataURL(file);
     });
-    fileInput.value = ""; 
-  });
+    fileInput.value = "";
+    });
 
 // Función para refrescar la lista
-function updateFilesUI() {
-    filesDisplay.innerHTML = ''; 
-    
-    attachedFiles.forEach(file => {
-        const item = document.createElement('div');
-        item.className = "file-item-row"; // Usamos una clase para el CSS
-        item.style = "display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px; margin-bottom: 4px; font-size: 11px;";
-        
-        item.innerHTML = `
-            <span style="color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
-                📄 ${file.name}
-            </span>
-            <button class="btn-remove-file" data-id="${file.id}" style="background: none; border: none; color: #cf6679; cursor: pointer; font-weight: bold; padding: 0 8px;">✕</button>
-        `;
-        
-        filesDisplay.appendChild(item);
-    });
-}
+  /**
+   * Refresh the attached files UI list.
+   */
+  function updateFilesUI() {
+  filesDisplay.innerHTML = '';
+
+  attachedFiles.forEach(file => {
+    const item = document.createElement('div');
+    item.className = "file-item-row";
+    item.style = "display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px; margin-bottom: 4px; font-size: 11px;";
+
+    item.innerHTML = `
+      <span style="color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
+        📄 ${file.name}
+      </span>
+      <button class="btn-remove-file" data-id="${file.id}" style="background: none; border: none; color: #cf6679; cursor: pointer; font-weight: bold; padding: 0 8px;">✕</button>
+    `;
+
+    filesDisplay.appendChild(item);
+  });
+  }
 
 // 🟢 DELEGACIÓN DE EVENTOS PARA EL BORRADO
 // Esto soluciona que la X no responda
 filesDisplay.addEventListener('click', (e) => {
-    if (e.target.classList.contains('btn-remove-file')) {
-        const idToRemove = e.target.getAttribute('data-id');
-        attachedFiles = attachedFiles.filter(f => f.id !== idToRemove);
-        console.log("Archivo eliminado, quedan:", attachedFiles.length);
-        updateFilesUI();
-    }
+  if (e.target.classList.contains('btn-remove-file')) {
+    const idToRemove = e.target.getAttribute('data-id');
+    attachedFiles = attachedFiles.filter(f => f.id !== idToRemove);
+    console.log("Archivo eliminado, quedan:", attachedFiles.length);
+    updateFilesUI();
+  }
 });
 
 // Modificación del evento btnSave.addEventListener
