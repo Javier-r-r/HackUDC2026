@@ -15,8 +15,6 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = "digital_brain"
 INBOX_DIR = os.path.join(BASE_DIR, "inbox")
 
-# --- CONFIGURACIÓN DE IA (GROQ) ---
-# PON TU API KEY AQUÍ:
 client = Groq()
 
 def extract_text_from_pdf(file_path):
@@ -49,10 +47,9 @@ def process_with_ai(file_path, filename):
                 transcription = client.audio.transcriptions.create(
                   file=(filename, file.read()),
                   model="whisper-large-v3",
-                  response_format="json", # Aseguramos formato correcto
+                  response_format="json",
                   language="es"
                 )
-            # Extraemos el texto de la respuesta de Groq
             text_content = transcription.text
             
         elif ext == 'pdf':
@@ -87,13 +84,12 @@ def process_with_ai(file_path, filename):
             messages=[{"role": "user", "content": prompt}],
             model="llama-3.1-8b-instant",
             temperature=0.2,
-            response_format={"type": "json_object"} # 🔥 Obligamos a que sea JSON válido
+            response_format={"type": "json_object"}
         )
         
         raw_json = chat_completion.choices[0].message.content
         result_data = json.loads(raw_json)
         
-        # Guardamos el texto completo para el contenido de la nota
         result_data["full_text"] = text_content 
         print(f"✨ ¡Éxito! IA asignó la categoría: {result_data.get('category')}")
         return result_data
@@ -102,7 +98,6 @@ def process_with_ai(file_path, filename):
         print(f"❌ Error interno en process_with_ai: {e}")
         return None
 
-# --- CONFIGURACIÓN BASE ---
 app = FastAPI(title="Kelea Digital Brain API")
 
 app.mount("/view_file", StaticFiles(directory=INBOX_DIR), name="static_files")
@@ -129,7 +124,6 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=sentence_transformer_ef
 )
 
-# --- MODELOS ---
 class FileData(BaseModel):
     name: str
     base64: str
@@ -147,29 +141,25 @@ class UpdateRequest(BaseModel):
     tags: Optional[List[str]] = None
     status: Optional[str] = None
     action: Optional[str] = None
-
-# --- ENDPOINTS ---
 @app.post("/capture")
 async def capture_entry(data: MultiCaptureRequest):
+    """Procesa una nueva entrada, guarda archivos adjuntos y genera su nota en markdown"""
     saved_files = []
     
     if data.files:
         for file in data.files:
             file_path = os.path.join(INBOX_DIR, file.name)
             
-            # 🔥 LA SOLUCIÓN MÁGICA: Limpiar el prefijo 'data:...' de Javascript
             b64_data = file.base64
             if "," in b64_data:
                 b64_data = b64_data.split(",")[1]
                 
-            # Ahora sí, guardamos el archivo perfectamente sano
             with open(file_path, "wb") as f:
                 f.write(base64.b64decode(b64_data))
             
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"note_{timestamp}_{file.name}.md"
             
-            # ✨ Llamamos a la IA con el archivo sano
             ai_data = process_with_ai(file_path, file.name)
             
             final_category = data.category or "Inbox"
@@ -232,6 +222,7 @@ async def capture_entry(data: MultiCaptureRequest):
 
 @app.post("/inbox")
 async def save_direct_to_inbox(item: dict):
+    """Guarda un item directamente en el inbox en formato markdown"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     item_type = item.get("type", "generic")
     filename = f"note_{item_type}_{timestamp}.md"
@@ -248,6 +239,7 @@ async def save_direct_to_inbox(item: dict):
 
 @app.get("/inbox")
 async def list_inbox():
+    """Lista todas las notas del inbox con sus metadatos y enlaces de descarga"""
     files = []
     for f in os.listdir(INBOX_DIR):
         if f.endswith(".md"):
@@ -258,7 +250,6 @@ async def list_inbox():
                     meta = yaml.safe_load(parts[1])
                     meta["filename"] = f
 
-                    # 1. Recopilar todos los adjuntos (lista o único)
                     adjuntos = meta.get("attached_files", [])
                     if not isinstance(adjuntos, list):
                         adjuntos = []
@@ -267,7 +258,6 @@ async def list_inbox():
                     if orig and orig not in adjuntos:
                         adjuntos.append(orig)
 
-                    # 2. Generar el campo 'download_links' que espera el Dashboard
                     links = []
                     for name in adjuntos:
                         if name:
@@ -278,13 +268,13 @@ async def list_inbox():
                                     "url": f"http://localhost:8000/view_file/{name}"
                                 })
                     
-                    # 3. Inyectar la lista en el objeto meta
                     meta["download_links"] = links
                     files.append(meta)
     return files
 
 @app.put("/inbox/{filename}")
 async def update_inbox_note(filename: str, req: UpdateRequest):
+    """Actualiza la categoría, tags o estado de una nota específica"""
     filepath = os.path.join(INBOX_DIR, filename) 
     
     if not os.path.exists(filepath):
@@ -315,6 +305,7 @@ async def update_inbox_note(filename: str, req: UpdateRequest):
 
 @app.delete("/inbox/{filename}")
 async def delete_note(filename: str):
+    """Elimina una nota y sus archivos adjuntos asociados del sistema y de la base de datos vectorial"""
     filepath = os.path.join(INBOX_DIR, filename)
     
     if not os.path.exists(filepath):
@@ -357,6 +348,7 @@ async def delete_note(filename: str):
 
 @app.get("/search")
 async def semantic_search(query: str, limit: int = 10):
+    """Realiza una búsqueda semántica en la base de datos vectorial"""
     try:
         results = collection.query(
             query_texts=[query],
