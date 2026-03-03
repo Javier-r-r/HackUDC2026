@@ -20,7 +20,6 @@ body {
   height: 100vh;
 }
 
-/* Sidebar */
 .sidebar {
   width: 250px;
   background-color: var(--bg-panel);
@@ -41,7 +40,6 @@ body {
 }
 .user-info { margin-top: auto; color: var(--text-muted); font-size: 12px; }
 
-/* Main Content */
 .content {
   flex: 1; padding: 40px; overflow-y: auto;
 }
@@ -49,7 +47,6 @@ header {
   display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 30px;
 }
 
-/* Grid de Notas */
 .items-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 24px;
 }
@@ -98,7 +95,6 @@ header {
   border: 1px solid var(--border);
 }
 
-/* Estados y validación (NUEVO) */
 .status-badge {
   font-size: 10px;
   padding: 3px 8px;
@@ -107,11 +103,11 @@ header {
   text-transform: uppercase;
 }
 .status-pending { 
-  background-color: #cf6679; /* Rojo suave */
+  background-color: #cf6679;
   color: #121212; 
 }
 .status-processed { 
-  background-color: #4caf50; /* Verde */
+  background-color: #4caf50;
   color: #121212; 
 }
 
@@ -135,7 +131,6 @@ header {
   font-size: 12px;
 }
 
-/* Botones */
 .btn-primary, .btn-secondary {
   padding: 8px 16px; border-radius: 6px; cursor: pointer; border: none; font-weight: bold;
 }
@@ -143,7 +138,6 @@ header {
 .btn-secondary { background-color: transparent; border: 1px solid var(--border); color: var(--text-main); }
 .card-actions { display: flex; gap: 10px; margin-top: auto; border-top: 1px solid var(--border); padding-top: 10px; }
 
-/* Modal */
 .modal {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7);
   display: flex; justify-content: center; align-items: center; z-index: 1000;
@@ -157,17 +151,15 @@ header {
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
 
-/* Utilidad para ocultar elementos */
 .hidden {
   display: none !important;
 }
 
-/* Estilos para el Modal de Lectura */
 .view-modal-content {
-  width: 600px; /* Más ancho para leer bien */
+  width: 600px;
   max-width: 90%;
-  max-height: 85vh; /* Si el texto es larguísimo, no se sale de la pantalla */
-  overflow-y: auto; /* Añade scroll interno si hace falta */
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
 .modal-header {
@@ -179,13 +171,12 @@ header {
 }
 
 .full-content {
-  white-space: pre-wrap; /* Mágico: respeta los saltos de línea reales de tu texto */
+  white-space: pre-wrap;
   line-height: 1.6;
   font-size: 15px;
   color: #ccc;
 }
 
-/* Inputs más estrechos para categoría/etiquetas en las tarjetas y modal */
 .edit-form input,
 input[id^="edit-cat-"],
 input[id^="edit-tags-"],
@@ -197,11 +188,8 @@ input[id^="edit-tags-"],
   box-sizing: border-box;
 }
 
-/* ==========================================
-   BADGE DE NOTIFICACIÓN
-   ========================================== */
 .badge {
-  background-color: #cf6679; /* Rojo suave / error */
+  background-color: #cf6679;
   color: #121212;
   border-radius: 50%;
   padding: 2px 7px;
@@ -212,7 +200,6 @@ input[id^="edit-tags-"],
   vertical-align: middle;
 }
 
-/* Animación de latido para llamar la atención */
 .badge.pulse {
   animation: pulse-red 2s infinite;
 }
