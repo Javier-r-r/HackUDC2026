@@ -74,6 +74,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 Haz doble clic en el archivo `index.html` para abrir tu Cerebro Digital en el navegador. *(Nota: La primera vez que uses la función "Conocer más" dentro del Dashboard, el navegador te pedirá la API Key por motivos de seguridad del LocalStorage).*
 
+---
+
 ## 🎮 Demo del Flujo de Trabajo (Paso a Paso)
 
 Para experimentar la verdadera magia del **Cerebro Digital**, te invitamos a seguir este recorrido de 60 segundos:
